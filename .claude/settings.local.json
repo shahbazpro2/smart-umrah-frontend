@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew clean *)",
+      "Bash(./gradlew --version)",
+      "Bash(./gradlew app:build --warning-mode=all)",
+      "Bash(./gradlew app:assembleDebug)"
+    ]
+  }
+}

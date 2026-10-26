@@ -3,17 +3,15 @@ import { SkeletonLoader } from '@/components/SkeletonLoader';
 import { BorderRadius, Colors, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useGetMediaById } from '@/hooks/useMediaQueries';
-import { useToast } from '@/hooks/useToast';
-import { getErrorMessage } from '@/services/error.handler';
-import { Media } from '@/services/media.service';
 import { Ionicons } from '@expo/vector-icons';
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
   Image,
-  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -102,97 +100,103 @@ function YoutubePlayer({ youtubeId, width }: { youtubeId: string; width: number 
   );
 }
 
-function LocalVideoPlayer({ assetUri, width }: { assetUri: string; width: number }) {
-  const [loading, setLoading] = useState(true);
+function NativeVideoPlayer({ source, width }: { source: any; width: number }) {
   const height = Math.round(width * (9 / 16));
-
-  const html = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; background: #000; }
-          html, body { width: 100%; height: 100%; overflow: hidden; display: flex; align-items: center; justify-content: center; }
-          video { width: 100%; height: 100%; object-fit: contain; }
-        </style>
-      </head>
-      <body>
-        <video controls playsinline preload="metadata">
-          <source src="${assetUri}" type="video/mp4">
-          Your browser does not support HTML5 video.
-        </video>
-      </body>
-    </html>
-  `;
+  const player = useVideoPlayer(source, (p) => {
+    p.loop = false;
+  });
 
   return (
     <View style={[styles.playerContainer, { width, height }]}>
-      {loading && (
-        <View style={styles.playerLoading}>
-          <ActivityIndicator size="large" color="#6366F1" />
-        </View>
-      )}
-      <WebView
-        source={{ html }}
+      <VideoView
         style={{ width, height, backgroundColor: '#000' }}
-        allowsFullscreenVideo
-        allowsInlineMediaPlayback
-        mediaPlaybackRequiresUserAction={false}
-        javaScriptEnabled
-        domStorageEnabled
-        originWhitelist={['*']}
-        onLoadEnd={() => setLoading(false)}
-        scrollEnabled={false}
-        bounces={false}
+        player={player}
+        allowsPictureInPicture
+        nativeControls
+        contentFit="contain"
       />
     </View>
   );
 }
 
-function LocalAudioPlayer({ assetUri, width }: { assetUri: string; width: number }) {
-  const [loading, setLoading] = useState(true);
-  const height = 90;
+function NativeAudioPlayer({ source, width }: { source: any; width: number }) {
+  const player = useAudioPlayer(source, { updateInterval: 250 });
+  const status = useAudioPlayerStatus(player);
 
-  const html = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { background: transparent; display: flex; align-items: center; justify-content: center; height: 100%; padding: 12px; }
-          audio { width: 100%; outline: none; }
-        </style>
-      </head>
-      <body>
-        <audio controls preload="metadata">
-          <source src="${assetUri}" type="audio/mpeg">
-          Your browser does not support the audio element.
-        </audio>
-      </body>
-    </html>
-  `;
+  const togglePlay = () => {
+    if (status.playing) {
+      player.pause();
+    } else {
+      player.play();
+    }
+  };
+
+  const handleSeek = (direction: 'forward' | 'backward') => {
+    const delta = direction === 'forward' ? 10 : -10;
+    const target = Math.max(0, Math.min(status.duration || 0, (status.currentTime || 0) + delta));
+    player.seekTo(target);
+  };
+
+  const formatTime = (seconds: number) => {
+    if (!seconds || isNaN(seconds) || seconds < 0) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
+  const progressPercent =
+    status.duration > 0
+      ? Math.min(100, Math.max(0, ((status.currentTime || 0) / status.duration) * 100))
+      : 0;
 
   return (
-    <View style={[styles.audioContainer, { width, height }]}>
-      {loading && (
-        <View style={styles.playerLoading}>
-          <ActivityIndicator size="small" color="#10B981" />
+    <View style={[styles.nativeAudioBox, { width }]}>
+      {/* Progress & Time */}
+      <View style={styles.audioProgressCol}>
+        <View style={styles.audioProgressBarTrack}>
+          <View style={[styles.audioProgressBarFill, { width: `${progressPercent}%` }]} />
         </View>
-      )}
-      <WebView
-        source={{ html }}
-        style={{ width, height, backgroundColor: 'transparent' }}
-        allowsInlineMediaPlayback
-        mediaPlaybackRequiresUserAction={false}
-        javaScriptEnabled
-        domStorageEnabled
-        originWhitelist={['*']}
-        onLoadEnd={() => setLoading(false)}
-        scrollEnabled={false}
-        bounces={false}
-      />
+        <View style={styles.audioTimeRow}>
+          <Text style={styles.audioTimeText}>{formatTime(status.currentTime)}</Text>
+          <Text style={styles.audioTimeText}>{formatTime(status.duration)}</Text>
+        </View>
+      </View>
+
+      {/* Playback Controls */}
+      <View style={styles.audioControlsRow}>
+        <Pressable
+          onPress={() => handleSeek('backward')}
+          style={styles.audioSecondaryBtn}
+          accessibilityLabel="Rewind 10 seconds"
+        >
+          <Ionicons name="play-back" size={20} color="#10B981" />
+        </Pressable>
+
+        <Pressable
+          onPress={togglePlay}
+          style={styles.audioMainPlayBtn}
+          accessibilityLabel={status.playing ? 'Pause' : 'Play'}
+        >
+          {status.isBuffering ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Ionicons
+              name={status.playing ? 'pause' : 'play'}
+              size={26}
+              color="#fff"
+              style={{ marginLeft: status.playing ? 0 : 2 }}
+            />
+          )}
+        </Pressable>
+
+        <Pressable
+          onPress={() => handleSeek('forward')}
+          style={styles.audioSecondaryBtn}
+          accessibilityLabel="Forward 10 seconds"
+        >
+          <Ionicons name="play-forward" size={20} color="#10B981" />
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -215,33 +219,24 @@ export default function MediaViewerScreen() {
     }
   };
 
-  const localResolvedUri = media?.localAsset ? Image.resolveAssetSource(media.localAsset)?.uri : null;
-
-  const mediaUrl = media
-    ? media.type === 'youtube'
-      ? (media.youtubeUrl ?? '')
-      : media.localAsset
-        ? (localResolvedUri ?? '')
-        : `${process.env.EXPO_PUBLIC_API_URL}${media.filePath}`
-    : '';
-
   const accent = media ? (MEDIA_ACCENT[media.type] ?? colors.primary) : colors.primary;
-  const toast = useToast();
 
-  const handleOpenMedia = async () => {
-    try {
-      if (mediaUrl) {
-        await Linking.openURL(mediaUrl);
-      }
-    } catch (err) {
-      toast.error('Could not open file', getErrorMessage(err, 'Unable to open this media file.'));
-    }
-  };
+  const videoSource = media
+    ? media.localAsset ?? (media.filePath ? `${process.env.EXPO_PUBLIC_API_URL}${media.filePath}` : null)
+    : null;
+
+  const audioSource = media
+    ? media.localAsset ?? (media.filePath ? `${process.env.EXPO_PUBLIC_API_URL}${media.filePath}` : null)
+    : null;
 
   const languageDisplay =
-    media?.language === 'en' ? 'English' :
-      media?.language === 'ar' ? 'العربية' :
-        media?.language === 'ur' ? 'اردو' : 'All Languages';
+    media?.language === 'en'
+      ? 'English'
+      : media?.language === 'ar'
+        ? 'العربية'
+        : media?.language === 'ur'
+          ? 'اردو'
+          : 'All Languages';
 
   if (loading) {
     return (
@@ -252,7 +247,11 @@ export default function MediaViewerScreen() {
           </View>
         </View>
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          <SkeletonLoader width="100%" height={Math.round((width - Spacing.lg * 2) * 9 / 16)} borderRadius={BorderRadius.xl} />
+          <SkeletonLoader
+            width="100%"
+            height={Math.round(((width - Spacing.lg * 2) * 9) / 16)}
+            borderRadius={BorderRadius.xl}
+          />
           <View style={{ marginTop: Spacing.lg, gap: Spacing.md }}>
             <SkeletonLoader width="70%" height={28} />
             <SkeletonLoader width="40%" height={16} />
@@ -279,10 +278,6 @@ export default function MediaViewerScreen() {
       </SafeAreaView>
     );
   }
-
-  const isLocalVideo = media.type === 'video' && !!localResolvedUri;
-  const isLocalAudio = media.type === 'audio' && !!localResolvedUri;
-  const isLocalImage = media.type === 'image' && !!media.localAsset;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -328,36 +323,32 @@ export default function MediaViewerScreen() {
             <View style={[styles.youtubeWrapper, { borderColor: colors.border }]}>
               <YoutubePlayer youtubeId={media.youtubeId} width={playerWidth} />
             </View>
-          ) : isLocalVideo ? (
+          ) : media.type === 'video' && videoSource ? (
             <View style={[styles.videoWrapper, { borderColor: colors.border }]}>
-              <LocalVideoPlayer assetUri={localResolvedUri!} width={playerWidth} />
+              <NativeVideoPlayer source={videoSource} width={playerWidth} />
             </View>
-          ) : isLocalImage ? (
-            <View style={[styles.imageWrapper, { borderColor: colors.border }]}>
-              <Image
-                source={media.localAsset}
-                style={[styles.image, { width: playerWidth }]}
-                resizeMode="contain"
-              />
-            </View>
-          ) : media.type === 'image' ? (
-            <View style={[styles.imageWrapper, { borderColor: colors.border }]}>
-              <Image
-                source={{ uri: mediaUrl }}
-                style={[styles.image, { width: playerWidth }]}
-                resizeMode="contain"
-              />
-            </View>
-          ) : isLocalAudio ? (
+          ) : media.type === 'audio' && audioSource ? (
             <View style={[styles.audioCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={[styles.audioIconBadge, { backgroundColor: `${accent}15` }]}>
                 <Ionicons name="musical-notes" size={32} color={accent} />
               </View>
-              <Text style={[styles.audioCardTitle, { color: colors.text }]}>Talbiyah Recitation</Text>
+              <Text style={[styles.audioCardTitle, { color: colors.text }]}>{media.title}</Text>
               <Text style={[styles.audioCardSub, { color: colors.icon }]}>
-                Listen to the blessed call of the pilgrims
+                High-quality offline recitation & pronunciation
               </Text>
-              <LocalAudioPlayer assetUri={localResolvedUri!} width={playerWidth - Spacing.lg * 2} />
+              <NativeAudioPlayer source={audioSource} width={playerWidth - Spacing.lg * 2} />
+            </View>
+          ) : media.type === 'image' ? (
+            <View style={[styles.imageWrapper, { borderColor: colors.border }]}>
+              <Image
+                source={
+                  media.localAsset ?? {
+                    uri: `${process.env.EXPO_PUBLIC_API_URL}${media.filePath}`,
+                  }
+                }
+                style={[styles.image, { width: playerWidth }]}
+                resizeMode="contain"
+              />
             </View>
           ) : (
             <View
@@ -374,18 +365,8 @@ export default function MediaViewerScreen() {
                 />
               </View>
               <Text style={[styles.playerLabel, { color: colors.text }]}>
-                {media.type === 'video' ? 'Video' : 'Audio'} File
+                Media Not Available
               </Text>
-              <Text style={[styles.playerHint, { color: colors.icon }]}>
-                Available for local device playback
-              </Text>
-              <AnimatedPressable
-                onPress={handleOpenMedia}
-                style={[styles.openBtn, { backgroundColor: accent }]}
-              >
-                <Ionicons name="open-outline" size={18} color="#fff" />
-                <Text style={styles.openBtnText}>Open File</Text>
-              </AnimatedPressable>
             </View>
           )}
         </FadeIn>
@@ -566,9 +547,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#00000080',
     zIndex: 1,
   },
-  audioContainer: {
-    justifyContent: 'center',
-  },
   audioCard: {
     borderRadius: BorderRadius.xl,
     borderWidth: 1,
@@ -591,6 +569,62 @@ const styles = StyleSheet.create({
   audioCardSub: {
     fontSize: 13,
     marginBottom: Spacing.xs,
+  },
+  nativeAudioBox: {
+    gap: Spacing.md,
+    marginTop: Spacing.xs,
+    paddingTop: Spacing.sm,
+  },
+  audioProgressCol: {
+    gap: 6,
+  },
+  audioProgressBarTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    overflow: 'hidden',
+  },
+  audioProgressBarFill: {
+    height: '100%',
+    borderRadius: 3,
+    backgroundColor: '#10B981',
+  },
+  audioTimeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 2,
+  },
+  audioTimeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  audioControlsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.lg,
+  },
+  audioMainPlayBtn: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: '#10B981',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  audioSecondaryBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   talbiyahBox: {
     borderRadius: BorderRadius.xl,
@@ -631,17 +665,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   playerLabel: { fontSize: 18, fontWeight: '700' },
-  playerHint: { fontSize: 13 },
-  openBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.full,
-    marginTop: Spacing.xs,
-  },
-  openBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
   titleSection: { gap: Spacing.xs },
   mediaTitle: { fontSize: 22, fontWeight: '800', letterSpacing: -0.3, lineHeight: 28 },
   mediaDescription: { fontSize: 14, lineHeight: 20, marginTop: 4 },
@@ -649,19 +672,19 @@ const styles = StyleSheet.create({
   metaBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.xs,
-    paddingHorizontal: Spacing.md,
+    gap: 4,
+    paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.full,
+    borderRadius: BorderRadius.sm,
   },
   metaText: { fontSize: 12, fontWeight: '600' },
   detailsCard: {
     borderRadius: BorderRadius.xl,
     borderWidth: 1,
     padding: Spacing.lg,
-    gap: Spacing.md,
+    gap: Spacing.sm,
   },
-  detailsHeading: { fontSize: 15, fontWeight: '700', letterSpacing: 0.2 },
+  detailsHeading: { fontSize: 16, fontWeight: '700', marginBottom: Spacing.xs },
   detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -675,7 +698,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  detailLabel: { fontSize: 11, fontWeight: '500' },
+  detailLabel: { fontSize: 12, fontWeight: '500' },
   detailValue: { fontSize: 13, fontWeight: '600', marginTop: 1 },
   centerContent: {
     flex: 1,
@@ -691,5 +714,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     width: '100%',
   },
-  errorTitle: { fontSize: 16, fontWeight: '700' },
+  errorTitle: { fontWeight: '700' },
 });

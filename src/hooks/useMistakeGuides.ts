@@ -1,11 +1,11 @@
-import { useQuery } from '@tanstack/react-query';
-import api from '@/services/api';
+import api from "@/services/api";
+import { useQuery } from "@tanstack/react-query";
 
 export interface MistakeGuide {
   _id: string;
   ritualId: string;
   ritualKey: string;
-  severity: 'low' | 'medium' | 'high' | 'critical';
+  severity: "low" | "medium" | "high" | "critical";
   title: string;
   description: string;
   commonMistakes: {
@@ -17,11 +17,11 @@ export interface MistakeGuide {
   allLanguages?: any;
 }
 
-export const useGetAllMistakeGuides = (language: string = 'en') => {
+export const useGetAllMistakeGuides = (language: string = "en") => {
   return useQuery({
-    queryKey: ['mistakeGuides', language],
+    queryKey: ["mistakeGuides", language],
     queryFn: async () => {
-      const { data } = await api.get<MistakeGuide[]>('/mistake-guides', {
+      const { data } = await api.get<MistakeGuide[]>("/mistake-guides", {
         params: { language },
       });
       return data;
@@ -30,13 +30,20 @@ export const useGetAllMistakeGuides = (language: string = 'en') => {
   });
 };
 
-export const useGetMistakeGuideByRitual = (ritualId: string, language: string = 'en', enabled: boolean = true) => {
+export const useGetMistakeGuideByRitual = (
+  ritualId: string,
+  language: string = "en",
+  enabled: boolean = true,
+) => {
   return useQuery({
-    queryKey: ['mistakeGuide', ritualId, language],
+    queryKey: ["mistakeGuide", ritualId, language],
     queryFn: async () => {
-      const { data } = await api.get<MistakeGuide>(`/mistake-guides/ritual/${ritualId}`, {
-        params: { language },
-      });
+      const { data } = await api.get<MistakeGuide>(
+        `/mistake-guides/ritual/${ritualId}`,
+        {
+          params: { language },
+        },
+      );
       return data;
     },
     enabled: enabled && !!ritualId,
@@ -45,9 +52,12 @@ export const useGetMistakeGuideByRitual = (ritualId: string, language: string = 
   });
 };
 
-export const useGetMistakesByKey = (ritualKey: string, language: string = 'en') => {
+export const useGetMistakesByKey = (
+  ritualKey: string,
+  language: string = "en",
+) => {
   return useQuery({
-    queryKey: ['mistakesByKey', ritualKey, language],
+    queryKey: ["mistakesByKey", ritualKey, language],
     queryFn: async () => {
       const { data } = await api.get(`/mistake-guides/by-key/${ritualKey}`, {
         params: { language },

@@ -1,10 +1,12 @@
 import { AnimatedCard } from '@/components/AnimatedCard';
 import { FadeIn, SlideIn } from '@/components/FadeIn';
+import { LearnPerformSwitch } from '@/components/LearnPerformSwitch';
 import { BorderRadius, Colors, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useElderlyMode } from '@/hooks/useElderlyMode';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useAuth } from '@/store/auth.context';
+import { useAppSettings } from '@/store/settings.store';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useRef } from 'react';
@@ -44,6 +46,7 @@ function QuickLinkCard({ label, icon, route, delay, onPress }: {
 export default function HomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { spiritualFocusMode } = useAppSettings();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
@@ -54,8 +57,9 @@ export default function HomeScreen() {
 
   const quickLinks: { label: string; icon: keyof typeof Ionicons.glyphMap; route: string }[] = [
     { label: t('home.rituals'), icon: 'book', route: '/(tabs)/rituals' },
-    { label: t('home.profile'), icon: 'person', route: '/(tabs)/profile' },
-    { label: t('home.media'), icon: 'play-circle', route: '/media' },
+    { label: 'Media Guides', icon: 'play-circle', route: '/media' },
+    { label: 'Spiritual Focus', icon: 'notifications-off', route: '/spiritual-focus' },
+    { label: 'Offline Search', icon: 'search', route: '/offline-assistant' },
   ];
 
   const rituals = [
@@ -71,6 +75,28 @@ export default function HomeScreen() {
         contentContainerStyle={[styles.contentContainer, { paddingBottom: bottomPadding }]}
         showsVerticalScrollIndicator={false}
       >
+        {/* Active Spiritual Focus Banner */}
+        {spiritualFocusMode && (
+          <FadeIn duration={300}>
+            <Pressable
+              onPress={() => router.push('/spiritual-focus')}
+              style={[
+                styles.focusActiveBanner,
+                { backgroundColor: '#10B98115', borderColor: '#10B981' },
+              ]}
+            >
+              <View style={styles.focusActiveLeft}>
+                <Ionicons name="notifications-off" size={16} color="#10B981" />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.focusActiveTitle}>Spiritual Focus Active</Text>
+                  <Text style={styles.focusActiveSub}>Notifications muted • Tap to resume silent guide</Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#10B981" />
+            </Pressable>
+          </FadeIn>
+        )}
+
         {/* Hero Header */}
         <FadeIn duration={500}>
           <View style={[styles.heroCard, { backgroundColor: colors.primary }]}>
@@ -84,6 +110,11 @@ export default function HomeScreen() {
             </View>
           </View>
         </FadeIn>
+
+        {/* Global Learn & Perform Switch */}
+        <SlideIn direction="up" delay={100} distance={20}>
+          <LearnPerformSwitch />
+        </SlideIn>
 
         {/* Quick Access */}
         <SlideIn direction="up" delay={150} distance={30}>
@@ -196,8 +227,34 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   contentContainer: {
     paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
+    paddingTop: Spacing.sm,
     gap: Spacing.md,
+  },
+  focusActiveBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 10,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    marginBottom: Spacing.xs,
+  },
+  focusActiveLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    flex: 1,
+  },
+  focusActiveTitle: {
+    color: '#10B981',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  focusActiveSub: {
+    color: '#10B981',
+    opacity: 0.85,
+    fontSize: 11,
   },
   heroCard: {
     borderRadius: BorderRadius.xl,

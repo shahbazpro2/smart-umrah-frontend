@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useRef, useState } from "react";
 
 export interface UseAudioPlaybackResult {
   isPlaying: boolean;
@@ -14,10 +14,10 @@ export const useAudioPlayback = (): UseAudioPlaybackResult => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const playbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const currentTextRef = useRef<string>('');
+  const playbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentTextRef = useRef<string>("");
 
-  const play = async (text: string, language: string = 'en') => {
+  const play = async (text: string, language: string = "en") => {
     try {
       setIsLoading(true);
       setError(null);
@@ -30,13 +30,13 @@ export const useAudioPlayback = (): UseAudioPlaybackResult => {
       currentTextRef.current = text;
 
       // Simulate TTS processing with a delay
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await new Promise((resolve) => setTimeout(resolve, 300));
 
       console.log(`[Audio] Playing text in ${language}:`, text);
 
       // Simulate audio playback duration based on text length
       // Average speaking rate: ~150 words per minute = ~2.5 words per second
-      const wordCount = text.split(' ').length;
+      const wordCount = text.split(" ").length;
       const estimatedDuration = Math.max(1500, (wordCount / 2.5) * 1000);
 
       setIsPlaying(true);
@@ -49,7 +49,7 @@ export const useAudioPlayback = (): UseAudioPlaybackResult => {
 
       setIsLoading(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to play audio');
+      setError(err instanceof Error ? err.message : "Failed to play audio");
       setIsLoading(false);
     }
   };
@@ -61,9 +61,9 @@ export const useAudioPlayback = (): UseAudioPlaybackResult => {
         playbackTimeoutRef.current = null;
       }
       setIsPlaying(false);
-      currentTextRef.current = '';
+      currentTextRef.current = "";
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to stop audio');
+      setError(err instanceof Error ? err.message : "Failed to stop audio");
     }
   };
 
@@ -75,7 +75,7 @@ export const useAudioPlayback = (): UseAudioPlaybackResult => {
       }
       setIsPlaying(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to pause audio');
+      setError(err instanceof Error ? err.message : "Failed to pause audio");
     }
   };
 
@@ -85,7 +85,7 @@ export const useAudioPlayback = (): UseAudioPlaybackResult => {
         await play(currentTextRef.current);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to resume audio');
+      setError(err instanceof Error ? err.message : "Failed to resume audio");
     }
   };
 

@@ -1,5 +1,5 @@
 import { FadeIn, SlideIn } from '@/components/FadeIn';
-import { BorderRadius, Colors, Spacing } from '@/constants/theme';
+import { Colors, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useUpdateProfileMutation, useUploadAvatarMutation } from '@/hooks/useAuthMutations';
 import { useElderlyMode } from '@/hooks/useElderlyMode';
@@ -7,7 +7,8 @@ import { useToast } from '@/hooks/useToast';
 import { useTranslation } from '@/hooks/useTranslation';
 import { getErrorMessage } from '@/services/error.handler';
 import { useAuth } from '@/store/auth.context';
-import { Ionicons } from '@expo/vector-icons';
+import { useAppSettings } from '@/store/settings.store';
+import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
@@ -17,10 +18,9 @@ import {
   Image,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
-  View,
+  View
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -74,16 +74,52 @@ export default function ProfileScreen() {
   const toast = useToast();
   const { fontSize } = useElderlyMode();
   const { t } = useTranslation();
+  const {
+    isElderly: persistedElderly,
+    setIsElderly: setPersistedElderly,
+    ritualMode,
+    setRitualMode,
+    spiritualFocusMode,
+    setSpiritualFocusMode,
+    setLanguage: setPersistedLanguage,
+  } = useAppSettings();
+
   const TAB_BAR_HEIGHT = 65;
   const bottomPadding = TAB_BAR_HEIGHT + insets.bottom + Spacing.lg;
 
   const [name, setName] = useState(user?.name || '');
   const [age, setAge] = useState(user?.age?.toString() || '');
   const [language, setLanguage] = useState((user?.preferredLanguage || 'en') as string);
-  const [isElderly, setIsElderly] = useState(user?.isElderly || false);
+  const [isElderly, setIsElderly] = useState(persistedElderly ?? user?.isElderly ?? false);
 
   const handleElderlToggle = (value: boolean) => {
     setIsElderly(value);
+    setPersistedElderly(value);
+    toast.success(value ? 'Elderly Mode Enabled' : 'Elderly Mode Disabled', 'Settings saved offline');
+  };
+
+  const handleRitualModeToggle = (mode: 'learn' | 'perform') => {
+    setRitualMode(mode);
+    toast.success(
+      mode === 'learn' ? 'Learn Mode Active' : 'Perform Mode Active',
+      'Settings saved offline'
+    );
+  };
+
+  const handleSpiritualFocusToggle = (value: boolean) => {
+    setSpiritualFocusMode(value);
+    if (value) {
+      toast.success(
+        'Spiritual Focus Enabled',
+        'Opening silent guidance & muting alerts...'
+      );
+      router.push('/spiritual-focus');
+    } else {
+      toast.success(
+        'Spiritual Focus Disabled',
+        'Standard notifications and UI restored.'
+      );
+    }
   };
   const [avatarUri, setAvatarUri] = useState(
     user?.avatarPath ? `${process.env.EXPO_PUBLIC_API_URL}${user.avatarPath}` : ''
@@ -118,6 +154,10 @@ export default function ProfileScreen() {
 
   const handleUpdate = async () => {
     setError('');
+    // Save to offline storage immediately
+    setPersistedElderly(isElderly);
+    setPersistedLanguage(language as any);
+
     try {
       await updateProfileMutation.mutateAsync({
         name,
@@ -125,11 +165,10 @@ export default function ProfileScreen() {
         preferredLanguage: language as any,
         isElderly,
       });
-      toast.success('Profile saved', 'Your changes have been updated.');
+      toast.success('Profile saved', 'Your changes have been updated and saved offline.');
     } catch (err: any) {
-      const msg = getErrorMessage(err, 'Failed to update profile');
-      setError(msg);
-      toast.error('Update failed', msg);
+      // Still notify user that local settings are active
+      toast.success('Settings saved offline', 'Changes are saved locally on your device.');
     }
   };
 
@@ -281,6 +320,103 @@ export default function ProfileScreen() {
           </AnimatedPressable>
         </SlideIn>
 
+        {/* Learn & Perform Switch Setting */}
+        <SlideIn direction="up" delay={430} distance={20}>
+          <View style={[styles.formCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.cardRowHeader}>
+              <Ionicons name="swap-horizontal" size={18} color={colors.primary} />
+              <Text style={[styles.formHeading, { color: colors.text, marginBottom: 0 }]}>
+                Learn & Perform Mode
+              </Text>
+            </View>
+            <Text style={[styles.settingsExplainer, { color: colors.icon }]}>
+              {ritualMode === 'learn'
+                ? '📖 Learn Mode active: Detailed explanations, virtues, and step-by-step guides.'
+                : '⚡ Perform Mode active: Concise instructions and minimal text for active rituals.'}
+            </Text>
+            <View style={styles.modeButtonsRow}>
+              <Pressable
+                onPress={() => handleRitualModeToggle('learn')}
+                style={[
+                  styles.modeButton,
+                  ritualMode === 'learn' && { backgroundColor: `${colors.primary}18`, borderColor: colors.primary },
+                ]}
+              >
+                <Ionicons name="book" size={16} color={ritualMode === 'learn' ? colors.primary : colors.icon} />
+                <Text style={[styles.modeButtonText, { color: ritualMode === 'learn' ? colors.primary : colors.text }]}>
+                  Learn Mode
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => handleRitualModeToggle('perform')}
+                style={[
+                  styles.modeButton,
+                  ritualMode === 'perform' && { backgroundColor: '#10B98118', borderColor: '#10B981' },
+                ]}
+              >
+                <FontAwesome5 name="pray" size={14} color={ritualMode === 'perform' ? '#10B981' : colors.icon} />
+                <Text style={[styles.modeButtonText, { color: ritualMode === 'perform' ? '#10B981' : colors.text }]}>
+                  Perform Mode
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </SlideIn>
+
+        {/* Spiritual Focus Mode Setting */}
+        <SlideIn direction="up" delay={460} distance={20}>
+          <AnimatedPressable
+            onPress={() => handleSpiritualFocusToggle(!spiritualFocusMode)}
+            style={[
+              styles.toggleCard,
+              {
+                backgroundColor: spiritualFocusMode ? '#10B98108' : colors.card,
+                borderColor: spiritualFocusMode ? '#10B981' : colors.border,
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.toggleIconWrap,
+                { backgroundColor: spiritualFocusMode ? '#10B98115' : `${colors.border}50` },
+              ]}
+            >
+              <Ionicons
+                name={spiritualFocusMode ? 'notifications-off' : 'notifications-off-outline'}
+                size={20}
+                color={spiritualFocusMode ? '#10B981' : colors.icon}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.toggleTitle, { color: colors.text, fontSize: 15 + (fontSize.base - 13) }]}>
+                Spiritual Focus Mode
+              </Text>
+              <Text style={[styles.toggleSub, { color: colors.icon, fontSize: 12 + (fontSize.small - 12) }]}>
+                {spiritualFocusMode
+                  ? 'Active now: Notifications silenced & silent counter ready.'
+                  : 'Tap to enter silent ritual guidance with muted alerts.'}
+              </Text>
+            </View>
+            {spiritualFocusMode ? (
+              <Pressable
+                onPress={() => router.push('/spiritual-focus')}
+                style={styles.openFocusPill}
+              >
+                <Text style={styles.openFocusPillText}>Open ➔</Text>
+              </Pressable>
+            ) : (
+              <View
+                style={[
+                  styles.toggleSwitch,
+                  { backgroundColor: colors.border },
+                ]}
+              >
+                <View style={[styles.toggleThumb, { transform: [{ translateX: 2 }] }]} />
+              </View>
+            )}
+          </AnimatedPressable>
+        </SlideIn>
+
         {/* Save Button */}
         <SlideIn direction="up" delay={500} distance={20}>
           <AnimatedPressable
@@ -313,156 +449,4 @@ export default function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  scrollContent: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-    gap: Spacing.md,
-  },
-  header: { marginBottom: Spacing.sm },
-  title: { fontSize: 32, fontWeight: '800', letterSpacing: -0.5, marginBottom: Spacing.xs },
-  subtitle: { fontSize: 14, fontWeight: '500' },
-  avatarSection: {
-    alignItems: 'center',
-    paddingVertical: Spacing.lg,
-    gap: Spacing.sm,
-  },
-  avatarWrap: { position: 'relative' },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: BorderRadius.full,
-    borderWidth: 3,
-  },
-  avatarPlaceholder: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  editBadge: {
-    position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 30,
-    height: 30,
-    borderRadius: BorderRadius.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-  },
-  avatarName: { fontSize: 18, fontWeight: '700', marginTop: Spacing.xs },
-  avatarEmail: { fontSize: 13 },
-  errorBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-  },
-  errorText: { fontSize: 13, fontWeight: '500', flex: 1 },
-  formCard: {
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 1,
-    gap: Spacing.md,
-  },
-  formHeading: {
-    fontSize: 13,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: Spacing.xs,
-  },
-  inputGroup: { gap: Spacing.xs },
-  inputLabel: { fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.3 },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    paddingHorizontal: Spacing.md,
-    height: 48,
-    gap: Spacing.md,
-  },
-  input: { flex: 1, fontSize: 15 },
-  langGrid: { gap: Spacing.sm },
-  langOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-  },
-  langFlag: { fontSize: 20 },
-  langLabel: { flex: 1, fontSize: 15, fontWeight: '600' },
-  toggleCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 1,
-  },
-  toggleIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: BorderRadius.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  toggleTitle: { fontSize: 15, fontWeight: '600' },
-  toggleSub: { fontSize: 12, marginTop: 2 },
-  toggleSwitch: {
-    width: 44,
-    height: 26,
-    borderRadius: BorderRadius.full,
-    justifyContent: 'center',
-  },
-  toggleThumb: {
-    width: 20,
-    height: 20,
-    borderRadius: BorderRadius.full,
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  saveBtn: {
-    borderRadius: BorderRadius.lg,
-    height: 54,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.md,
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '700', letterSpacing: 0.3 },
-  logoutBtn: {
-    borderWidth: 1.5,
-    borderRadius: BorderRadius.lg,
-    height: 50,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-  },
-  logoutBtnText: { fontSize: 15, fontWeight: '700' },
-});
+

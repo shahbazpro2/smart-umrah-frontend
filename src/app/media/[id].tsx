@@ -3,16 +3,15 @@ import { SkeletonLoader } from '@/components/SkeletonLoader';
 import { BorderRadius, Colors, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useGetMediaById } from '@/hooks/useMediaQueries';
-import { useToast } from '@/hooks/useToast';
-import { getErrorMessage } from '@/services/error.handler';
 import { Ionicons } from '@expo/vector-icons';
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
   Image,
-  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -29,17 +28,6 @@ const MEDIA_ACCENT: Record<string, string> = {
   image: '#F59E0B',
   youtube: '#FF0000',
 };
-
-interface Media {
-  _id: string;
-  title: string;
-  type: 'video' | 'audio' | 'image' | 'youtube';
-  language: string;
-  fileName?: string;
-  filePath: string;
-  youtubeUrl?: string;
-  youtubeId?: string;
-}
 
 function AnimatedPressable({ onPress, disabled, style, children }: any) {
   const scale = useRef(new Animated.Value(1)).current;
@@ -64,9 +52,8 @@ function AnimatedPressable({ onPress, disabled, style, children }: any) {
 
 function YoutubePlayer({ youtubeId, width }: { youtubeId: string; width: number }) {
   const [webLoading, setWebLoading] = useState(true);
-  const height = Math.round(width * (9 / 16)); // 16:9 aspect ratio
+  const height = Math.round(width * (9 / 16));
 
-  // Full YouTube embed HTML — enables fullscreen, native controls, autoplay off
   const html = `
     <!DOCTYPE html>
     <html>
@@ -113,6 +100,107 @@ function YoutubePlayer({ youtubeId, width }: { youtubeId: string; width: number 
   );
 }
 
+function NativeVideoPlayer({ source, width }: { source: any; width: number }) {
+  const height = Math.round(width * (9 / 16));
+  const player = useVideoPlayer(source, (p) => {
+    p.loop = false;
+  });
+
+  return (
+    <View style={[styles.playerContainer, { width, height }]}>
+      <VideoView
+        style={{ width, height, backgroundColor: '#000' }}
+        player={player}
+        allowsPictureInPicture
+        nativeControls
+        contentFit="contain"
+      />
+    </View>
+  );
+}
+
+function NativeAudioPlayer({ source, width }: { source: any; width: number }) {
+  const player = useAudioPlayer(source, { updateInterval: 250 });
+  const status = useAudioPlayerStatus(player);
+
+  const togglePlay = () => {
+    if (status.playing) {
+      player.pause();
+    } else {
+      player.play();
+    }
+  };
+
+  const handleSeek = (direction: 'forward' | 'backward') => {
+    const delta = direction === 'forward' ? 10 : -10;
+    const target = Math.max(0, Math.min(status.duration || 0, (status.currentTime || 0) + delta));
+    player.seekTo(target);
+  };
+
+  const formatTime = (seconds: number) => {
+    if (!seconds || isNaN(seconds) || seconds < 0) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
+  const progressPercent =
+    status.duration > 0
+      ? Math.min(100, Math.max(0, ((status.currentTime || 0) / status.duration) * 100))
+      : 0;
+
+  return (
+    <View style={[styles.nativeAudioBox, { width }]}>
+      {/* Progress & Time */}
+      <View style={styles.audioProgressCol}>
+        <View style={styles.audioProgressBarTrack}>
+          <View style={[styles.audioProgressBarFill, { width: `${progressPercent}%` }]} />
+        </View>
+        <View style={styles.audioTimeRow}>
+          <Text style={styles.audioTimeText}>{formatTime(status.currentTime)}</Text>
+          <Text style={styles.audioTimeText}>{formatTime(status.duration)}</Text>
+        </View>
+      </View>
+
+      {/* Playback Controls */}
+      <View style={styles.audioControlsRow}>
+        <Pressable
+          onPress={() => handleSeek('backward')}
+          style={styles.audioSecondaryBtn}
+          accessibilityLabel="Rewind 10 seconds"
+        >
+          <Ionicons name="play-back" size={20} color="#10B981" />
+        </Pressable>
+
+        <Pressable
+          onPress={togglePlay}
+          style={styles.audioMainPlayBtn}
+          accessibilityLabel={status.playing ? 'Pause' : 'Play'}
+        >
+          {status.isBuffering ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Ionicons
+              name={status.playing ? 'pause' : 'play'}
+              size={26}
+              color="#fff"
+              style={{ marginLeft: status.playing ? 0 : 2 }}
+            />
+          )}
+        </Pressable>
+
+        <Pressable
+          onPress={() => handleSeek('forward')}
+          style={styles.audioSecondaryBtn}
+          accessibilityLabel="Forward 10 seconds"
+        >
+          <Ionicons name="play-forward" size={20} color="#10B981" />
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 export default function MediaViewerScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
@@ -130,61 +218,44 @@ export default function MediaViewerScreen() {
       router.replace('/media');
     }
   };
-  const mediaUrl = media
-    ? media.type === 'youtube'
-      ? (media.youtubeUrl ?? '')
-      : `${process.env.EXPO_PUBLIC_API_URL}${media.filePath}`
-    : '';
-  const accent = media ? (MEDIA_ACCENT[media.type] ?? colors.primary) : colors.primary;
-  const toast = useToast();
 
-  const handleOpenMedia = async () => {
-    try {
-      await Linking.openURL(mediaUrl);
-    } catch (err) {
-      toast.error('Could not open file', getErrorMessage(err, 'Unable to open this media file.'));
-    }
-  };
+  const accent = media ? (MEDIA_ACCENT[media.type] ?? colors.primary) : colors.primary;
+
+  const videoSource = media
+    ? media.localAsset ?? (media.filePath ? `${process.env.EXPO_PUBLIC_API_URL}${media.filePath}` : null)
+    : null;
+
+  const audioSource = media
+    ? media.localAsset ?? (media.filePath ? `${process.env.EXPO_PUBLIC_API_URL}${media.filePath}` : null)
+    : null;
 
   const languageDisplay =
-    media?.language === 'en' ? 'English' :
-      media?.language === 'ar' ? 'العربية' :
-        media?.language === 'ur' ? 'اردو' : 'All Languages';
+    media?.language === 'en'
+      ? 'English'
+      : media?.language === 'ar'
+        ? 'العربية'
+        : media?.language === 'ur'
+          ? 'اردو'
+          : 'All Languages';
 
   if (loading) {
     return (
-      <SafeAreaView
-        style={[styles.container, { backgroundColor: colors.background }]}
-      >
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.navBar}>
           <View style={[styles.backBtn, { borderColor: colors.border }]}>
             <Ionicons name="chevron-back" size={22} color={colors.primary} />
           </View>
         </View>
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <SkeletonLoader width="100%" height={Math.round((width - Spacing.lg * 2) * 9 / 16)} borderRadius={BorderRadius.xl} />
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <SkeletonLoader
+            width="100%"
+            height={Math.round(((width - Spacing.lg * 2) * 9) / 16)}
+            borderRadius={BorderRadius.xl}
+          />
           <View style={{ marginTop: Spacing.lg, gap: Spacing.md }}>
             <SkeletonLoader width="70%" height={28} />
             <SkeletonLoader width="40%" height={16} />
           </View>
-          {[1, 2].map((i) => (
-            <View
-              key={i}
-              style={[
-                styles.detailCard,
-                { backgroundColor: colors.card, borderColor: colors.border, marginTop: Spacing.md },
-              ]}
-            >
-              <SkeletonLoader width={32} height={32} borderRadius={BorderRadius.sm} />
-              <View style={{ flex: 1, gap: Spacing.xs }}>
-                <SkeletonLoader width="40%" height={12} />
-                <SkeletonLoader width="60%" height={16} />
-              </View>
-            </View>
-          ))}
         </ScrollView>
       </SafeAreaView>
     );
@@ -192,24 +263,14 @@ export default function MediaViewerScreen() {
 
   if (isError || !media) {
     return (
-      <SafeAreaView
-        style={[styles.container, { backgroundColor: colors.background }]}
-      >
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.navBar}>
-          <AnimatedPressable
-            onPress={handleBack}
-            style={[styles.backBtn, { borderColor: colors.border }]}
-          >
+          <AnimatedPressable onPress={handleBack} style={[styles.backBtn, { borderColor: colors.border }]}>
             <Ionicons name="chevron-back" size={22} color={colors.primary} />
           </AnimatedPressable>
         </View>
         <View style={styles.centerContent}>
-          <View
-            style={[
-              styles.errorBox,
-              { backgroundColor: `${colors.error}10`, borderColor: `${colors.error}30` },
-            ]}
-          >
+          <View style={[styles.errorBox, { backgroundColor: `${colors.error}10`, borderColor: `${colors.error}30` }]}>
             <Ionicons name="alert-circle" size={32} color={colors.error} />
             <Text style={[styles.errorTitle, { color: colors.error }]}>Media not found</Text>
           </View>
@@ -219,59 +280,77 @@ export default function MediaViewerScreen() {
   }
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background }]}
-    >
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Nav */}
       <View style={styles.navBar}>
-        <AnimatedPressable
-          onPress={handleBack}
-          style={[styles.backBtn, { borderColor: colors.border }]}
-        >
+        <AnimatedPressable onPress={handleBack} style={[styles.backBtn, { borderColor: colors.border }]}>
           <Ionicons name="chevron-back" size={22} color={colors.primary} />
         </AnimatedPressable>
-        <View style={[styles.typePill, { backgroundColor: `${accent}15` }]}>
-          <Ionicons
-            name={
-              media.type === 'youtube'
-                ? 'logo-youtube'
-                : media.type === 'video'
-                  ? 'play-circle'
-                  : media.type === 'audio'
-                    ? 'musical-notes'
-                    : 'image'
-            }
-            size={13}
-            color={accent}
-          />
-          <Text style={[styles.typeText, { color: accent }]}>{media.type.toUpperCase()}</Text>
+        <View style={styles.navBadges}>
+          {media.localAsset && (
+            <View style={styles.offlineNavPill}>
+              <Ionicons name="cloud-offline" size={12} color="#10B981" />
+              <Text style={styles.offlineNavText}>Offline Ready</Text>
+            </View>
+          )}
+          <View style={[styles.typePill, { backgroundColor: `${accent}15` }]}>
+            <Ionicons
+              name={
+                media.type === 'youtube'
+                  ? 'logo-youtube'
+                  : media.type === 'video'
+                    ? 'play-circle'
+                    : media.type === 'audio'
+                      ? 'musical-notes'
+                      : 'image'
+              }
+              size={13}
+              color={accent}
+            />
+            <Text style={[styles.typeText, { color: accent }]}>{media.type.toUpperCase()}</Text>
+          </View>
         </View>
       </View>
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        // Prevent scroll conflict with WebView
         nestedScrollEnabled
       >
         {/* Media Display */}
         <FadeIn duration={400}>
           {media.type === 'youtube' && media.youtubeId ? (
-            // Inline YouTube player
             <View style={[styles.youtubeWrapper, { borderColor: colors.border }]}>
               <YoutubePlayer youtubeId={media.youtubeId} width={playerWidth} />
             </View>
+          ) : media.type === 'video' && videoSource ? (
+            <View style={[styles.videoWrapper, { borderColor: colors.border }]}>
+              <NativeVideoPlayer source={videoSource} width={playerWidth} />
+            </View>
+          ) : media.type === 'audio' && audioSource ? (
+            <View style={[styles.audioCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={[styles.audioIconBadge, { backgroundColor: `${accent}15` }]}>
+                <Ionicons name="musical-notes" size={32} color={accent} />
+              </View>
+              <Text style={[styles.audioCardTitle, { color: colors.text }]}>{media.title}</Text>
+              <Text style={[styles.audioCardSub, { color: colors.icon }]}>
+                High-quality offline recitation & pronunciation
+              </Text>
+              <NativeAudioPlayer source={audioSource} width={playerWidth - Spacing.lg * 2} />
+            </View>
           ) : media.type === 'image' ? (
-            <Image
-              source={{ uri: mediaUrl }}
-              style={[
-                styles.image,
-                { width: playerWidth, borderColor: colors.border },
-              ]}
-              resizeMode="cover"
-            />
+            <View style={[styles.imageWrapper, { borderColor: colors.border }]}>
+              <Image
+                source={
+                  media.localAsset ?? {
+                    uri: `${process.env.EXPO_PUBLIC_API_URL}${media.filePath}`,
+                  }
+                }
+                style={[styles.image, { width: playerWidth }]}
+                resizeMode="contain"
+              />
+            </View>
           ) : (
-            // Audio / Video file — open externally
             <View
               style={[
                 styles.playerCard,
@@ -286,45 +365,56 @@ export default function MediaViewerScreen() {
                 />
               </View>
               <Text style={[styles.playerLabel, { color: colors.text }]}>
-                {media.type === 'video' ? 'Video' : 'Audio'} File
+                Media Not Available
               </Text>
-              <Text style={[styles.playerHint, { color: colors.icon }]}>
-                Opens in your device's default player
-              </Text>
-              <AnimatedPressable
-                onPress={handleOpenMedia}
-                style={[styles.openBtn, { backgroundColor: accent }]}
-              >
-                <Ionicons name="open-outline" size={18} color="#fff" />
-                <Text style={styles.openBtnText}>Open File</Text>
-              </AnimatedPressable>
             </View>
           )}
         </FadeIn>
+
+        {/* Special Dua/Talbiyah Card for Audio */}
+        {media._id === 'audio_talbiyah_translation' && (
+          <SlideIn direction="up" delay={80} distance={15}>
+            <View style={[styles.talbiyahBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[styles.arabicText, { color: colors.text }]}>
+                لَبَّيْكَ اللَّهُمَّ لَبَّيْكَ، لَبَّيْكَ لاَ شَرِيكَ لَكَ لَبَّيْكَ، إِنَّ الْحَمْدَ وَالنِّعْمَةَ لَكَ وَالْمُلْكَ لاَ شَرِيكَ لَكَ
+              </Text>
+              <Text style={[styles.translitText, { color: colors.primary }]}>
+                "Labbayk Allaahumma labbayk, labbayka laa shareeka laka labbayk, innal-hamda wan-ni'mata laka wal-mulk, laa shareeka lak."
+              </Text>
+              <Text style={[styles.transText, { color: colors.icon }]}>
+                "Here I am, O Allah, here I am. Here I am, You have no partner, here I am. Verily all praise and grace are Yours, and the sovereignty. You have no partner."
+              </Text>
+            </View>
+          </SlideIn>
+        )}
 
         {/* Title & Meta */}
         <SlideIn direction="up" delay={100} distance={20}>
           <View style={styles.titleSection}>
             <Text style={[styles.mediaTitle, { color: colors.text }]}>{media.title}</Text>
+            {media.description && (
+              <Text style={[styles.mediaDescription, { color: colors.icon }]}>
+                {media.description}
+              </Text>
+            )}
             <View style={styles.metaRow}>
               <View style={[styles.metaBadge, { backgroundColor: `${accent}12` }]}>
                 <Ionicons name="globe-outline" size={13} color={accent} />
                 <Text style={[styles.metaText, { color: accent }]}>{languageDisplay}</Text>
               </View>
-              {media.type === 'youtube' && media.youtubeUrl && (
-                <AnimatedPressable
-                  onPress={handleOpenMedia}
-                  style={[styles.metaBadge, { backgroundColor: '#FF000012' }]}
-                >
-                  <Ionicons name="logo-youtube" size={13} color="#FF0000" />
-                  <Text style={[styles.metaText, { color: '#FF0000' }]}>Open in YouTube</Text>
-                </AnimatedPressable>
+              {media.ritualKey && (
+                <View style={[styles.metaBadge, { backgroundColor: `${colors.primary}12` }]}>
+                  <Ionicons name="book-outline" size={13} color={colors.primary} />
+                  <Text style={[styles.metaText, { color: colors.primary }]}>
+                    Ritual: {media.ritualKey.toUpperCase()}
+                  </Text>
+                </View>
               )}
             </View>
           </View>
         </SlideIn>
 
-        {/* Details */}
+        {/* Details Card */}
         <SlideIn direction="up" delay={200} distance={20}>
           <View
             style={[
@@ -336,11 +426,13 @@ export default function MediaViewerScreen() {
             {[
               { icon: 'document-outline' as const, label: 'Type', value: media.type.toUpperCase() },
               { icon: 'globe-outline' as const, label: 'Language', value: languageDisplay },
-              ...(media.youtubeId
-                ? [{ icon: 'key-outline' as const, label: 'Video ID', value: media.youtubeId }]
-                : []),
+              {
+                icon: 'cloud-done-outline' as const,
+                label: 'Availability',
+                value: media.localAsset ? 'Available 100% Offline' : 'Cloud / Streaming',
+              },
               ...(media.fileName
-                ? [{ icon: 'folder-outline' as const, label: 'File Name', value: media.fileName }]
+                ? [{ icon: 'folder-outline' as const, label: 'File', value: media.fileName }]
                 : []),
             ].map((row, i, arr) => (
               <View
@@ -358,10 +450,7 @@ export default function MediaViewerScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.detailLabel, { color: colors.icon }]}>{row.label}</Text>
-                  <Text
-                    style={[styles.detailValue, { color: colors.text }]}
-                    numberOfLines={1}
-                  >
+                  <Text style={[styles.detailValue, { color: colors.text }]} numberOfLines={1}>
                     {row.value}
                   </Text>
                 </View>
@@ -391,6 +480,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  navBadges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  offlineNavPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
+  },
+  offlineNavText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#10B981',
+  },
   typePill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -399,11 +507,11 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xs,
     borderRadius: BorderRadius.full,
   },
-  typeText: { fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
+  typeText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
   scrollContent: {
     paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.xxxl,
-    gap: Spacing.md,
+    paddingBottom: Spacing.massive,
+    gap: Spacing.lg,
   },
   youtubeWrapper: {
     borderRadius: BorderRadius.xl,
@@ -411,115 +519,187 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     backgroundColor: '#000',
   },
-  playerContainer: {
+  videoWrapper: {
+    borderRadius: BorderRadius.xl,
+    overflow: 'hidden',
+    borderWidth: 1,
     backgroundColor: '#000',
+  },
+  imageWrapper: {
+    borderRadius: BorderRadius.xl,
+    overflow: 'hidden',
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#00000008',
+  },
+  image: {
+    height: 320,
+  },
+  playerContainer: {
     position: 'relative',
+    backgroundColor: '#000',
   },
   playerLoading: {
     ...StyleSheet.absoluteFill,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#000',
+    backgroundColor: '#00000080',
     zIndex: 1,
   },
-  image: {
-    height: 260,
+  audioCard: {
     borderRadius: BorderRadius.xl,
     borderWidth: 1,
-  },
-  playerCard: {
-    borderRadius: BorderRadius.xl,
-    padding: Spacing.xxxl,
+    padding: Spacing.lg,
     alignItems: 'center',
-    gap: Spacing.md,
-    borderWidth: 1,
+    gap: Spacing.sm,
   },
-  playerIconWrap: {
-    width: 100,
-    height: 100,
+  audioIconBadge: {
+    width: 64,
+    height: 64,
     borderRadius: BorderRadius.full,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.xs,
   },
-  playerLabel: { fontSize: 18, fontWeight: '700' },
-  playerHint: { fontSize: 13, textAlign: 'center' },
-  openBtn: {
+  audioCardTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  audioCardSub: {
+    fontSize: 13,
+    marginBottom: Spacing.xs,
+  },
+  nativeAudioBox: {
+    gap: Spacing.md,
+    marginTop: Spacing.xs,
+    paddingTop: Spacing.sm,
+  },
+  audioProgressCol: {
+    gap: 6,
+  },
+  audioProgressBarTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    overflow: 'hidden',
+  },
+  audioProgressBarFill: {
+    height: '100%',
+    borderRadius: 3,
+    backgroundColor: '#10B981',
+  },
+  audioTimeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 2,
+  },
+  audioTimeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  audioControlsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    marginTop: Spacing.sm,
-    shadowColor: '#000',
+    justifyContent: 'center',
+    gap: Spacing.lg,
+  },
+  audioMainPlayBtn: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: '#10B981',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#10B981',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.35,
     shadowRadius: 8,
     elevation: 4,
   },
-  openBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  titleSection: { gap: Spacing.sm },
-  mediaTitle: { fontSize: 22, fontWeight: '800', letterSpacing: -0.5 },
-  metaRow: { flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap' },
+  audioSecondaryBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  talbiyahBox: {
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1,
+    padding: Spacing.lg,
+    gap: Spacing.md,
+  },
+  arabicText: {
+    fontSize: 22,
+    fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: 38,
+  },
+  translitText: {
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+    fontStyle: 'italic',
+    lineHeight: 22,
+  },
+  transText: {
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  playerCard: {
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1,
+    padding: Spacing.xxl,
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  playerIconWrap: {
+    width: 96,
+    height: 96,
+    borderRadius: BorderRadius.full,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  playerLabel: { fontSize: 18, fontWeight: '700' },
+  titleSection: { gap: Spacing.xs },
+  mediaTitle: { fontSize: 22, fontWeight: '800', letterSpacing: -0.3, lineHeight: 28 },
+  mediaDescription: { fontSize: 14, lineHeight: 20, marginTop: 4 },
+  metaRow: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.xs, flexWrap: 'wrap' },
   metaBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.xs,
-    paddingHorizontal: Spacing.md,
+    gap: 4,
+    paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.full,
+    borderRadius: BorderRadius.sm,
   },
   metaText: { fontSize: 12, fontWeight: '600' },
   detailsCard: {
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.xl,
     borderWidth: 1,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 1,
+    padding: Spacing.lg,
+    gap: Spacing.sm,
   },
-  detailsHeading: {
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.lg,
-    paddingBottom: Spacing.md,
-  },
+  detailsHeading: { fontSize: 16, fontWeight: '700', marginBottom: Spacing.xs },
   detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-  },
-  detailCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
+    paddingVertical: Spacing.sm,
   },
   detailIconWrap: {
-    width: 36,
-    height: 36,
+    width: 32,
+    height: 32,
     borderRadius: BorderRadius.sm,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  detailLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-    marginBottom: 2,
-  },
-  detailValue: { fontSize: 14, fontWeight: '600' },
+  detailLabel: { fontSize: 12, fontWeight: '500' },
+  detailValue: { fontSize: 13, fontWeight: '600', marginTop: 1 },
   centerContent: {
     flex: 1,
     justifyContent: 'center',
@@ -534,5 +714,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     width: '100%',
   },
-  errorTitle: { fontSize: 16, fontWeight: '700' },
+  errorTitle: { fontWeight: '700' },
 });

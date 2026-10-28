@@ -1,5 +1,5 @@
-import { User } from '@/services/auth.service';
-import { atom } from 'jotai';
+import { User } from "@/services/auth.service";
+import { atom } from "jotai";
 
 export const userAtom = atom<User | null>(null);
 export const tokenAtom = atom<string | null>(null);

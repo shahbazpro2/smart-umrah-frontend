@@ -11,7 +11,7 @@
  *  @is_offline           – 'true' | 'false' persisted flag (optional, for cold start)
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // ─── Cache ────────────────────────────────────────────────────────────────────
 
@@ -19,7 +19,10 @@ const cacheKey = (url: string) => `@cache/${url}`;
 
 export async function cacheSet(url: string, data: any): Promise<void> {
   try {
-    await AsyncStorage.setItem(cacheKey(url), JSON.stringify({ data, cachedAt: Date.now() }));
+    await AsyncStorage.setItem(
+      cacheKey(url),
+      JSON.stringify({ data, cachedAt: Date.now() }),
+    );
   } catch {
     // storage full or unavailable — silently skip
   }
@@ -46,14 +49,14 @@ export async function cacheClear(url: string): Promise<void> {
 export async function cacheFlushAll(): Promise<void> {
   try {
     const keys = await AsyncStorage.getAllKeys();
-    const cacheKeys = keys.filter(k => k.startsWith('@cache/'));
+    const cacheKeys = keys.filter((k) => k.startsWith("@cache/"));
     if (cacheKeys.length) await AsyncStorage.multiRemove(cacheKeys);
   } catch {}
 }
 
 // ─── Pending progress queue ───────────────────────────────────────────────────
 
-const QUEUE_KEY = '@progress_queue';
+const QUEUE_KEY = "@progress_queue";
 
 export interface PendingProgress {
   ritualId: string;
@@ -73,7 +76,7 @@ export async function queueAdd(ritualId: string): Promise<void> {
   try {
     const existing = await queueGetAll();
     // Deduplicate — don't queue the same ritual twice
-    if (existing.some(p => p.ritualId === ritualId)) return;
+    if (existing.some((p) => p.ritualId === ritualId)) return;
     existing.push({ ritualId, queuedAt: new Date().toISOString() });
     await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(existing));
   } catch {}
@@ -82,7 +85,7 @@ export async function queueAdd(ritualId: string): Promise<void> {
 export async function queueRemove(ritualId: string): Promise<void> {
   try {
     const existing = await queueGetAll();
-    const updated = existing.filter(p => p.ritualId !== ritualId);
+    const updated = existing.filter((p) => p.ritualId !== ritualId);
     await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(updated));
   } catch {}
 }
@@ -95,7 +98,7 @@ export async function queueClear(): Promise<void> {
 
 // ─── Last sync timestamp ──────────────────────────────────────────────────────
 
-const SYNC_TS_KEY = '@offline_synced_at';
+const SYNC_TS_KEY = "@offline_synced_at";
 
 export async function setSyncedAt(iso: string): Promise<void> {
   try {

@@ -1,13 +1,16 @@
+import { LearnPerformSwitch } from '@/components/LearnPerformSwitch';
 import { SkeletonCard } from '@/components/SkeletonLoader';
 import { BorderRadius, Colors, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useElderlyMode } from '@/hooks/useElderlyMode';
-import { useGetAllRituals, useGetProgress } from '@/hooks/useRitualQueries';
+import { useGetAllRituals, useGetProgress, useResetProgressMutation } from '@/hooks/useRitualQueries';
+import { useToast } from '@/hooks/useToast';
 import { useAuth } from '@/store/auth.context';
+import { useAppSettings } from '@/store/settings.store';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useRef } from 'react';
-import { Animated, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Animated, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface Ritual {
@@ -82,13 +85,95 @@ export default function RitualsScreen() {
     ? `${completedCount} of 8 rituals completed`
     : 'Begin your journey';
 
+  const { spiritualFocusMode, setSpiritualFocusMode } = useAppSettings();
+
+  const resetMutation = useResetProgressMutation();
+  const toast = useToast();
+
+  const handleConfirmReset = () => {
+    Alert.alert(
+      'Reset Umrah Journey?',
+      'Are you sure you want to restart your journey from Step 1? This will reset all completed rituals.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset to Step 1',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await resetMutation.mutateAsync();
+              toast.success('Journey Reset', 'All rituals reset. You can now start fresh from Step 1.');
+            } catch {
+              toast.error('Reset Failed', 'Could not reset journey. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const Header = (
     <>
       <View style={styles.headerSection}>
-        <Text style={[styles.title, { color: colors.text }]}>Umrah Rituals</Text>
-        <Text style={[styles.subtitle, { color: colors.icon }]}>
-          {loading ? '8 sacred steps' : `${rituals.length} sacred steps`}
-        </Text>
+        <View style={styles.headerTopRow}>
+          <View>
+            <Text style={[styles.title, { color: colors.text }]}>Umrah Rituals</Text>
+            <Text style={[styles.subtitle, { color: colors.icon }]}>
+              {loading ? '8 sacred steps' : `${rituals.length} sacred steps`}
+            </Text>
+          </View>
+          <Pressable
+            onPress={() => {
+              setSpiritualFocusMode(true);
+              router.push('/spiritual-focus');
+            }}
+            style={[
+              styles.spiritualFocusBtn,
+              spiritualFocusMode
+                ? { borderColor: '#10B981', backgroundColor: '#10B98118' }
+                : { borderColor: colors.border, backgroundColor: colors.card },
+            ]}
+          >
+            <Ionicons
+              name={spiritualFocusMode ? 'notifications-off' : 'notifications-off-outline'}
+              size={14}
+              color={spiritualFocusMode ? '#10B981' : colors.icon}
+            />
+            <Text
+              style={[
+                styles.spiritualFocusBtnText,
+                { color: spiritualFocusMode ? '#10B981' : colors.icon },
+              ]}
+            >
+              Focus Mode
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+
+      {/* Active Spiritual Focus Banner */}
+      {spiritualFocusMode && (
+        <Pressable
+          onPress={() => router.push('/spiritual-focus')}
+          style={[
+            styles.focusActiveBanner,
+            { backgroundColor: '#10B98115', borderColor: '#10B981' },
+          ]}
+        >
+          <View style={styles.focusActiveLeft}>
+            <Ionicons name="notifications-off" size={16} color="#10B981" />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.focusActiveTitle}>Spiritual Focus Active</Text>
+              <Text style={styles.focusActiveSub}>Notifications muted • Tap to resume silent guide</Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#10B981" />
+        </Pressable>
+      )}
+
+      {/* Learn & Perform Switch */}
+      <View style={styles.switchWrapper}>
+        <LearnPerformSwitch />
       </View>
 
       {/* Start Umrah Banner */}
@@ -117,15 +202,28 @@ export default function RitualsScreen() {
           <Ionicons name="chevron-forward" size={20} color="#fff" />
         </View>
       </Pressable>
+
+      {completedCount > 0 && (
+        <View style={styles.resetRow}>
+          <Pressable onPress={handleConfirmReset} style={styles.resetBtn}>
+            <Ionicons name="refresh" size={13} color={colors.primary} />
+            <Text style={[styles.resetBtnText, { color: colors.primary }]}>
+              Reset journey to start from Step 1
+            </Text>
+          </Pressable>
+        </View>
+      )}
     </>
   );
 
   if (loading) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        {Header}
-        <View style={styles.skeletonList}>
-          {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
+        <View style={styles.listContent}>
+          {Header}
+          <View style={styles.skeletonList}>
+            {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
+          </View>
         </View>
       </SafeAreaView>
     );
@@ -171,9 +269,55 @@ export default function RitualsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   headerSection: {
-    paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
-    paddingBottom: Spacing.md,
+    paddingBottom: Spacing.sm,
+  },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  spiritualFocusBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.full,
+  },
+  spiritualFocusBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  focusActiveBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 10,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    marginBottom: Spacing.md,
+  },
+  focusActiveLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    flex: 1,
+  },
+  focusActiveTitle: {
+    color: '#10B981',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  focusActiveSub: {
+    color: '#10B981',
+    opacity: 0.85,
+    fontSize: 11,
+  },
+  switchWrapper: {
+    marginBottom: Spacing.md,
   },
   title: {
     fontSize: 32,
@@ -183,14 +327,28 @@ const styles = StyleSheet.create({
   },
   subtitle: { fontSize: 14, fontWeight: '500' },
   startBanner: {
-    marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.md,
     borderRadius: BorderRadius.lg,
     shadowColor: '#6366F1',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 12,
     elevation: 4,
+  },
+  resetRow: {
+    marginBottom: Spacing.md,
+    alignItems: 'center',
+  },
+  resetBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  resetBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   bannerContent: {
     flexDirection: 'row',
@@ -200,7 +358,8 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   bannerIconWrap: {
-    fontSize: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   bannerIcon: {
     fontSize: 32,
@@ -211,7 +370,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
   },
   skeletonList: {
-    paddingHorizontal: Spacing.lg,
     gap: Spacing.sm,
   },
   cardWrap: {

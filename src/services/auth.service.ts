@@ -1,12 +1,12 @@
-import api from './api';
+import api from "./api";
 
 export interface RegisterData {
   name: string;
   email: string;
   password: string;
   age?: number;
-  preferredLanguage: 'en' | 'ar' | 'ur';
-  experienceLevel: 'first_time' | 'experienced';
+  preferredLanguage: "en" | "ar" | "ur";
+  experienceLevel: "first_time" | "experienced";
   isElderly: boolean;
 }
 
@@ -19,10 +19,10 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  preferredLanguage: 'en' | 'ar' | 'ur';
+  preferredLanguage: "en" | "ar" | "ur";
   age?: number;
   isElderly?: boolean;
-  experienceLevel?: 'first_time' | 'experienced';
+  experienceLevel?: "first_time" | "experienced";
   avatarPath?: string;
   createdAt?: string;
 }
@@ -35,18 +35,20 @@ export interface AuthResponse {
 export interface ProfileUpdateData {
   name?: string;
   age?: number;
-  preferredLanguage?: 'en' | 'ar' | 'ur';
+  preferredLanguage?: "en" | "ar" | "ur";
   isElderly?: boolean;
 }
 
 export const authService = {
-  register: (data: RegisterData) => api.post<AuthResponse>('/auth/register', data),
-  login: (data: LoginData) => api.post<AuthResponse>('/auth/login', data),
-  getCurrentUser: () => api.get<User>('/auth/me'),
-  updateProfile: (data: ProfileUpdateData) => api.put<User>('/users/profile', data),
+  register: (data: RegisterData) =>
+    api.post<AuthResponse>("/auth/register", data),
+  login: (data: LoginData) => api.post<AuthResponse>("/auth/login", data),
+  getCurrentUser: () => api.get<User>("/auth/me"),
+  updateProfile: (data: ProfileUpdateData) =>
+    api.put<User>("/users/profile", data),
   uploadAvatar: (formData: FormData) =>
-    api.post<{ avatarPath: string }>('/users/avatar', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+    api.post<{ avatarPath: string }>("/users/avatar", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
     }),
 };
 
@@ -55,9 +57,9 @@ export const authService = {
 // This is NOT cryptographically secure server-side auth — it's a convenience
 // offline fallback for a user who has already authenticated online before.
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const OFFLINE_CREDS_KEY = '@offline_credentials';
+const OFFLINE_CREDS_KEY = "@offline_credentials";
 
 /** Cheap deterministic hash — good enough for a local offline check */
 function simpleHash(str: string): string {

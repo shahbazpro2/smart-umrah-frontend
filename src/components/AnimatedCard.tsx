@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { StyleSheet, Animated, ViewStyle, StyleProp, View } from 'react-native';
+import { BorderRadius, Colors, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors, BorderRadius, Spacing } from '@/constants/theme';
+import React, { useState } from 'react';
+import { Animated, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 
 interface AnimatedCardProps {
   children: React.ReactNode;

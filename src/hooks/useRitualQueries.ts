@@ -1,9 +1,9 @@
-import { normaliseProgress, ritualService } from '@/services/ritual.service';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { normaliseProgress, ritualService } from "@/services/ritual.service";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export const useGetAllRituals = () => {
   return useQuery({
-    queryKey: ['rituals'],
+    queryKey: ["rituals"],
     queryFn: async () => {
       const { data } = await ritualService.getAll();
       return data;
@@ -14,7 +14,7 @@ export const useGetAllRituals = () => {
 
 export const useGetRitualById = (id: string) => {
   return useQuery({
-    queryKey: ['ritual', id],
+    queryKey: ["ritual", id],
     queryFn: async () => {
       const { data } = await ritualService.getById(id);
       return data;
@@ -26,7 +26,7 @@ export const useGetRitualById = (id: string) => {
 
 export const useGetProgress = (enabled: boolean = true) => {
   return useQuery({
-    queryKey: ['progress'],
+    queryKey: ["progress"],
     queryFn: async () => {
       const { data } = await ritualService.getProgress();
       // Normalise: backend returns isCompleted + populated ritualId object
@@ -47,31 +47,53 @@ export const useMarkCompleteMutation = () => {
       if (wasQueued) {
         // Offline path — optimistically update the local progress cache
         // so the checklist immediately shows this step as done
-        queryClient.setQueryData(['progress'], (old: any[] | undefined) => {
+        queryClient.setQueryData(["progress"], (old: any[] | undefined) => {
           if (!old) return [{ ritualId, completed: true }];
-          const exists = old.some(p => p.ritualId === ritualId);
+          const exists = old.some((p) => p.ritualId === ritualId);
           if (exists) {
-            return old.map(p => p.ritualId === ritualId ? { ...p, completed: true } : p);
+            return old.map((p) =>
+              p.ritualId === ritualId ? { ...p, completed: true } : p,
+            );
           }
           return [...old, { ritualId, completed: true }];
         });
       } else {
         // Online path — force immediate refetch from server
         await Promise.all([
-          queryClient.refetchQueries({ queryKey: ['progress'], exact: true }),
-          queryClient.refetchQueries({ queryKey: ['progressStats'], exact: true }),
+          queryClient.refetchQueries({ queryKey: ["progress"], exact: true }),
+          queryClient.refetchQueries({
+            queryKey: ["progressStats"],
+            exact: true,
+          }),
         ]);
       }
     },
     onError: (error: any) => {
-      console.error('Mark complete error:', error);
+      console.error("Mark complete error:", error);
+    },
+  });
+};
+
+export const useResetProgressMutation = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => ritualService.resetProgress(),
+    onSuccess: async () => {
+      queryClient.setQueryData(["progress"], []);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["progress"] }),
+        queryClient.invalidateQueries({ queryKey: ["progressStats"] }),
+      ]);
+    },
+    onError: (error: any) => {
+      console.error("Reset progress error:", error);
     },
   });
 };
 
 export const useGetProgressStats = (enabled: boolean = true) => {
   return useQuery({
-    queryKey: ['progressStats'],
+    queryKey: ["progressStats"],
     queryFn: async () => {
       const { data } = await ritualService.getStats();
       return data;

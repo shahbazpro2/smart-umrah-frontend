@@ -1,4 +1,4 @@
-import { useElderlyMode } from './useElderlyMode';
+import { useElderlyMode } from "./useElderlyMode";
 
 /**
  * Hook for getting adaptive text sizes based on elderly mode
@@ -18,22 +18,22 @@ export const useAdaptiveText = () => {
     headline: 60 + adjustment,
 
     // Section sizes
-    h1: 32 + adjustment,      // Page titles
-    h2: 24 + adjustment,      // Section titles
-    h3: 20 + adjustment,      // Subsection titles
-    h4: 18 + adjustment,      // Card titles
-    h5: 16 + adjustment,      // Subtitle
+    h1: 32 + adjustment, // Page titles
+    h2: 24 + adjustment, // Section titles
+    h3: 20 + adjustment, // Subsection titles
+    h4: 18 + adjustment, // Card titles
+    h5: 16 + adjustment, // Subtitle
 
     // Body sizes
-    body: 15 + adjustment,    // Main body text
+    body: 15 + adjustment, // Main body text
     bodyMedium: 15 + adjustment,
     bodySmall: 14 + adjustment,
 
     // Small sizes
-    label: 13 + adjustment,   // Labels, descriptions
+    label: 13 + adjustment, // Labels, descriptions
     small: 13 + adjustment,
     caption: 12 + adjustment, // Captions, helper text
-    tiny: 11 + adjustment,    // Mini labels
+    tiny: 11 + adjustment, // Mini labels
 
     // Utilities
     buttonText: 16 + adjustment,

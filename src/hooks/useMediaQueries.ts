@@ -1,9 +1,9 @@
-import { mediaService } from '@/services/media.service';
-import { useQuery } from '@tanstack/react-query';
+import { mediaService } from "@/services/media.service";
+import { useQuery } from "@tanstack/react-query";
 
 export const useGetAllMedia = (type?: string, language?: string) => {
   return useQuery({
-    queryKey: ['mediaList', type, language],
+    queryKey: ["mediaList", type, language],
     queryFn: async () => {
       const { data } = await mediaService.getAll(type, language);
       return data;
@@ -14,7 +14,7 @@ export const useGetAllMedia = (type?: string, language?: string) => {
 
 export const useGetMediaById = (id: string) => {
   return useQuery({
-    queryKey: ['mediaItem', id],
+    queryKey: ["mediaItem", id],
     queryFn: async () => {
       const { data } = await mediaService.getById(id);
       return data;
@@ -26,7 +26,7 @@ export const useGetMediaById = (id: string) => {
 
 export const useGetRitualMedia = (ritualId: string) => {
   return useQuery({
-    queryKey: ['ritualMedia', ritualId],
+    queryKey: ["ritualMedia", ritualId],
     queryFn: async () => {
       const { data } = await mediaService.getByRitual(ritualId);
       return data;

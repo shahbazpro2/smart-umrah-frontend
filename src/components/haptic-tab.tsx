@@ -1,16 +1,7 @@
 import * as Haptics from 'expo-haptics';
-import { Pressable, ViewStyle } from 'react-native';
+import { Pressable } from 'react-native';
 
-interface HapticTabProps {
-  onPress?: () => void;
-  onPressIn?: (ev: any) => void;
-  onPressOut?: (ev: any) => void;
-  style?: ViewStyle | ViewStyle[];
-  children?: React.ReactNode;
-  [key: string]: any;
-}
-
-export function HapticTab(props: HapticTabProps) {
+export function HapticTab(props: any) {
   return (
     <Pressable
       {...props}

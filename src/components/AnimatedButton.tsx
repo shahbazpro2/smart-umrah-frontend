@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { TouchableOpacity, StyleSheet, ViewStyle, StyleProp, Animated } from 'react-native';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import React, { useState } from 'react';
+import { Animated, StyleProp, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
 
 interface AnimatedButtonProps {
   onPress: () => void;

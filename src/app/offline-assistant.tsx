@@ -47,6 +47,18 @@ function AnimatedPressable({ onPress, disabled, style, children }: any) {
   );
 }
 
+const POPULAR_KEYWORDS = [
+  'Ihram',
+  'Talbiyah',
+  'Tawaf',
+  'Zamzam',
+  'Sa\'i',
+  'Halq',
+  'Mistakes',
+  'Elderly',
+  'Dua',
+];
+
 export default function OfflineAssistantScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
@@ -70,7 +82,6 @@ export default function OfflineAssistantScreen() {
   const clearMutation = useClearOfflineCache();
   const nlpAssistant = useNLPAssistant();
   const [lastSyncTime, setLastSyncTime] = useState<string>('');
-  const [showQA, setShowQA] = useState(false);
   const [inputQuestion, setInputQuestion] = useState('');
 
   useEffect(() => {
@@ -99,42 +110,179 @@ export default function OfflineAssistantScreen() {
     }
   };
 
-  const handleAskQuestion = async () => {
-    if (!inputQuestion.trim()) {
-      toast.error('Empty Question', 'Please type a question');
+  const executeSearch = async (searchTerm: string) => {
+    if (!searchTerm.trim()) {
+      toast.error('Empty Query', 'Please enter a keyword or query');
       return;
     }
 
     const lang = (user?.preferredLanguage || 'en') as string;
     await nlpAssistant.askQuestion(
-      inputQuestion,
+      searchTerm,
       offlineRituals,
       offlineMistakes,
       lang
     );
-    setInputQuestion('');
+  };
+
+  const handleAskQuestion = async () => {
+    await executeSearch(inputQuestion);
+  };
+
+  const handleTapKeyword = async (kw: string) => {
+    setInputQuestion(kw);
+    await executeSearch(kw);
   };
 
   const isSynced = syncStatus?.syncStatus === 'synced';
   const isSyncing = syncMutation.isPending;
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background }]}
-    >
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.headerSection}>
-          <Pressable onPress={handleBack} style={styles.backBtn}>
+          <Pressable onPress={handleBack} style={[styles.backBtn, { borderColor: colors.border }]}>
             <Ionicons name="chevron-back" size={22} color={colors.primary} />
           </Pressable>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.title, { color: colors.text }]}>Offline Assistant</Text>
+            <Text style={[styles.title, { color: colors.text }]}>Offline Smart Assistant</Text>
             <Text style={[styles.subtitle, { color: colors.icon }]}>
-              Download data for offline access
+              Keyword-based answers & offline guidance
             </Text>
           </View>
         </View>
+
+        {/* ================= KEYWORD BASED SEARCH & QUERY ================= */}
+        <SlideIn direction="up" delay={50} distance={15}>
+          <View style={[styles.searchSectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.searchSectionHeader}>
+              <View style={[styles.searchIconBadge, { backgroundColor: `${colors.primary}15` }]}>
+                <Ionicons name="search" size={18} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.qaTitle, { color: colors.text }]}>Keyword Search & Q&A</Text>
+                <Text style={[styles.qaSub, { color: colors.icon }]}>
+                  Type any Umrah term (e.g. Ihram, Tawaf, Zamzam) to get an immediate reply
+                </Text>
+              </View>
+            </View>
+
+            {/* Keyword Chips */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.keywordChipsRow}
+            >
+              {POPULAR_KEYWORDS.map((kw) => (
+                <Pressable
+                  key={kw}
+                  onPress={() => handleTapKeyword(kw)}
+                  style={[
+                    styles.keywordChip,
+                    {
+                      backgroundColor: inputQuestion.toLowerCase() === kw.toLowerCase() ? colors.primary : `${colors.primary}10`,
+                      borderColor: colors.primary,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.keywordChipText,
+                      { color: inputQuestion.toLowerCase() === kw.toLowerCase() ? '#fff' : colors.primary },
+                    ]}
+                  >
+                    #{kw}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+
+            {/* Input Bar */}
+            <View style={styles.inputWrapper}>
+              <TextInput
+                placeholder="Search a keyword or ask a question..."
+                placeholderTextColor={colors.icon}
+                value={inputQuestion}
+                onChangeText={setInputQuestion}
+                onSubmitEditing={handleAskQuestion}
+                style={[styles.input, { color: colors.text, borderColor: colors.border }]}
+                editable={!nlpAssistant.isLoading}
+                returnKeyType="search"
+              />
+              <Pressable
+                onPress={handleAskQuestion}
+                disabled={nlpAssistant.isLoading}
+                style={[
+                  styles.sendBtn,
+                  { backgroundColor: colors.primary },
+                  nlpAssistant.isLoading && { opacity: 0.6 },
+                ]}
+              >
+                {nlpAssistant.isLoading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Ionicons name="search" size={16} color="#fff" />
+                )}
+              </Pressable>
+            </View>
+
+            {/* Answer Display */}
+            {nlpAssistant.answer && (
+              <FadeIn duration={300}>
+                <View style={[styles.answerBox, { backgroundColor: `${colors.primary}08`, borderColor: colors.primary }]}>
+                  <View style={styles.answerHeader}>
+                    <Text style={[styles.answerTitle, { color: colors.text }]}>
+                      {nlpAssistant.answer.title}
+                    </Text>
+                    {nlpAssistant.answer.confidence > 0 && (
+                      <View style={[styles.confBadge, { backgroundColor: '#10B98115' }]}>
+                        <Text style={styles.confBadgeText}>
+                          {Math.round(nlpAssistant.answer.confidence * 100)}% match
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Arabic Text if present */}
+                  {nlpAssistant.answer.arabic && (
+                    <View style={[styles.arabicCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                      <Text style={[styles.arabicText, { color: colors.text }]}>
+                        {nlpAssistant.answer.arabic}
+                      </Text>
+                      {nlpAssistant.answer.transliteration && (
+                        <Text style={[styles.translitText, { color: colors.primary }]}>
+                          "{nlpAssistant.answer.transliteration}"
+                        </Text>
+                      )}
+                    </View>
+                  )}
+
+                  {/* Content Lines */}
+                  <View style={styles.answerContent}>
+                    {nlpAssistant.answer.content.map((line, idx) => (
+                      <Text key={idx} style={[styles.answerText, { color: colors.text }]}>
+                        {line}
+                      </Text>
+                    ))}
+                  </View>
+
+                  {/* Related Media Link if present */}
+                  {nlpAssistant.answer.relatedMediaId && (
+                    <Pressable
+                      onPress={() => router.push(`/media/${nlpAssistant.answer?.relatedMediaId}`)}
+                      style={[styles.relatedMediaBtn, { backgroundColor: colors.primary }]}
+                    >
+                      <Ionicons name="play-circle" size={16} color="#fff" />
+                      <Text style={styles.relatedMediaBtnText}>View Related Media Guide</Text>
+                      <Ionicons name="chevron-forward" size={14} color="#fff" />
+                    </Pressable>
+                  )}
+                </View>
+              </FadeIn>
+            )}
+          </View>
+        </SlideIn>
 
         {/* Status Card */}
         <FadeIn duration={400}>
@@ -161,12 +309,12 @@ export default function OfflineAssistantScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.statusTitle, { color: colors.text }]}>
-                {isSynced ? 'Synced' : 'Not Synced'}
+                {isSynced ? 'Offline Data Synced' : 'Ready for Sync'}
               </Text>
               <Text style={[styles.statusText, { color: colors.icon }]}>
                 {isSynced && lastSyncTime
                   ? `Last synced: ${lastSyncTime}`
-                  : 'Sync data to enable offline access'}
+                  : 'Sync data to enable complete offline access'}
               </Text>
             </View>
           </View>
@@ -181,7 +329,7 @@ export default function OfflineAssistantScreen() {
                 { backgroundColor: colors.card, borderColor: colors.border },
               ]}
             >
-              <Text style={[styles.statsTitle, { color: colors.text }]}>Data Available</Text>
+              <Text style={[styles.statsTitle, { color: colors.text }]}>Offline Data Available</Text>
 
               <View style={styles.statsGrid}>
                 {[
@@ -234,7 +382,7 @@ export default function OfflineAssistantScreen() {
               </View>
 
               <View style={[styles.sizeInfo, { backgroundColor: `${colors.primary}08` }]}>
-                <Text style={[styles.sizeLabel, { color: colors.icon }]}>Data Size:</Text>
+                <Text style={[styles.sizeLabel, { color: colors.icon }]}>Total Size:</Text>
                 <Text style={[styles.sizeValue, { color: colors.text }]}>
                   ~{(stats.statistics.estimatedSize / 1024 / 1024).toFixed(2)} MB
                 </Text>
@@ -243,160 +391,8 @@ export default function OfflineAssistantScreen() {
           </SlideIn>
         )}
 
-        {/* Features */}
-        {stats && (
-          <SlideIn direction="up" delay={200} distance={20}>
-            <View
-              style={[
-                styles.featuresCard,
-                { backgroundColor: colors.card, borderColor: colors.border },
-              ]}
-            >
-              <Text style={[styles.featuresTitle, { color: colors.text }]}>
-                Offline Features
-              </Text>
-
-              {[
-                { name: 'Rituals', enabled: stats.features.canViewRituals },
-                { name: 'Mistake Guides', enabled: stats.features.canViewMistakeGuides },
-                { name: 'Elderly Guides', enabled: stats.features.canViewElderlyGuides },
-                { name: 'Media', enabled: stats.features.canAccessMedia },
-              ].map((feature, idx) => (
-                <View key={idx} style={styles.featureRow}>
-                  <Ionicons
-                    name={feature.enabled ? 'checkmark-circle' : 'close-circle'}
-                    size={18}
-                    color={feature.enabled ? '#10B981' : colors.icon}
-                  />
-                  <Text style={[styles.featureName, { color: colors.text }]}>
-                    {feature.name}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </SlideIn>
-        )}
-
-        {/* Smart Assistant */}
-        {!showQA ? (
-          <SlideIn direction="up" delay={300} distance={20}>
-            <Pressable
-              onPress={() => setShowQA(true)}
-              style={[
-                styles.assistantBtn,
-                { backgroundColor: `${colors.primary}15`, borderColor: colors.primary },
-              ]}
-            >
-              <Ionicons name="chatbubble-ellipses-outline" size={20} color={colors.primary} />
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.assistantTitle, { color: colors.text }]}>
-                  Smart Assistant
-                </Text>
-                <Text style={[styles.assistantSub, { color: colors.icon }]}>
-                  Ask questions about rituals & guidance
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.primary} />
-            </Pressable>
-          </SlideIn>
-        ) : (
-          <>
-            <SlideIn direction="up" delay={300} distance={20}>
-              <View
-                style={[
-                  styles.qaSection,
-                  { backgroundColor: colors.card, borderColor: colors.border },
-                ]}
-              >
-                <View style={styles.qaHeader}>
-                  <Text style={[styles.qaTitle, { color: colors.text }]}>
-                    Ask a Question
-                  </Text>
-                  <Pressable
-                    onPress={() => {
-                      setShowQA(false);
-                      nlpAssistant.clearAnswer();
-                    }}
-                  >
-                    <Ionicons name="close" size={20} color={colors.icon} />
-                  </Pressable>
-                </View>
-
-                <View style={styles.inputWrapper}>
-                  <TextInput
-                    placeholder="Ask about rituals, mistakes, elderly care..."
-                    placeholderTextColor={colors.icon}
-                    value={inputQuestion}
-                    onChangeText={setInputQuestion}
-                    style={[
-                      styles.input,
-                      { color: colors.text, borderColor: colors.border },
-                    ]}
-                    editable={!nlpAssistant.isLoading}
-                  />
-                  <Pressable
-                    onPress={handleAskQuestion}
-                    disabled={nlpAssistant.isLoading}
-                    style={[
-                      styles.sendBtn,
-                      { backgroundColor: colors.primary },
-                      nlpAssistant.isLoading && { opacity: 0.6 },
-                    ]}
-                  >
-                    {nlpAssistant.isLoading ? (
-                      <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                      <Ionicons name="send" size={16} color="#fff" />
-                    )}
-                  </Pressable>
-                </View>
-
-                {nlpAssistant.answer && (
-                  <View
-                    style={[
-                      styles.answerBox,
-                      { backgroundColor: `${colors.primary}08` },
-                    ]}
-                  >
-                    <View style={styles.answerHeader}>
-                      <Text style={[styles.answerTitle, { color: colors.text }]}>
-                        {nlpAssistant.answer.title}
-                      </Text>
-                      {nlpAssistant.answer.confidence > 0 && (
-                        <Text
-                          style={[
-                            styles.confidence,
-                            {
-                              color:
-                                nlpAssistant.answer.confidence > 0.7
-                                  ? '#10B981'
-                                  : '#F59E0B',
-                            },
-                          ]}
-                        >
-                          {Math.round(nlpAssistant.answer.confidence * 100)}%
-                        </Text>
-                      )}
-                    </View>
-                    <View style={styles.answerContent}>
-                      {nlpAssistant.answer.content.map((line, idx) => (
-                        <Text
-                          key={idx}
-                          style={[styles.answerText, { color: colors.text }]}
-                        >
-                          {line}
-                        </Text>
-                      ))}
-                    </View>
-                  </View>
-                )}
-              </View>
-            </SlideIn>
-          </>
-        )}
-
         {/* Actions */}
-        <SlideIn direction="up" delay={300} distance={20}>
+        <SlideIn direction="up" delay={250} distance={20}>
           <AnimatedPressable
             onPress={handleSync}
             disabled={isSyncing}
@@ -420,7 +416,7 @@ export default function OfflineAssistantScreen() {
         </SlideIn>
 
         {isSynced && (
-          <SlideIn direction="up" delay={400} distance={20}>
+          <SlideIn direction="up" delay={300} distance={20}>
             <AnimatedPressable
               onPress={handleClear}
               disabled={clearMutation.isPending}
@@ -444,8 +440,7 @@ export default function OfflineAssistantScreen() {
         <View style={[styles.infoSection, { backgroundColor: `${colors.primary}08` }]}>
           <Ionicons name="information-circle-outline" size={16} color={colors.primary} />
           <Text style={[styles.infoText, { color: colors.icon }]}>
-            Syncing enables offline access to all rituals, media, and guidance. Sync periodically to
-            keep your data up-to-date.
+            All guides, media, and keyword search work seamlessly offline with no internet required.
           </Text>
         </View>
       </ScrollView>
@@ -457,189 +452,200 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollContent: {
     paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.xxxl,
-    gap: Spacing.md,
+    paddingVertical: Spacing.md,
+    gap: Spacing.lg,
+    paddingBottom: Spacing.massive,
   },
   headerSection: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
-    marginBottom: Spacing.sm,
   },
   backBtn: {
     width: 40,
     height: 40,
     borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  title: { fontSize: 24, fontWeight: '800', letterSpacing: -0.5 },
-  subtitle: { fontSize: 13, fontWeight: '500', marginTop: 2 },
-  statusCard: {
-    borderRadius: BorderRadius.lg,
+  title: { fontSize: 24, fontWeight: '800', letterSpacing: -0.3 },
+  subtitle: { fontSize: 13, marginTop: 2 },
+  searchSectionCard: {
+    borderRadius: BorderRadius.xl,
     borderWidth: 1,
-    padding: Spacing.md,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    padding: Spacing.lg,
     gap: Spacing.md,
   },
-  statusBadge: {
-    width: 48,
-    height: 48,
-    borderRadius: BorderRadius.md,
+  searchSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  searchIconBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  statusTitle: { fontSize: 16, fontWeight: '700', marginBottom: Spacing.xs },
-  statusText: { fontSize: 12, lineHeight: 16 },
-  statsCard: {
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    padding: Spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 1,
-  },
-  statsTitle: { fontSize: 15, fontWeight: '700', marginBottom: Spacing.md },
-  statsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: Spacing.md,
-  },
-  statItem: {
-    alignItems: 'center',
+  qaTitle: { fontSize: 16, fontWeight: '800' },
+  qaSub: { fontSize: 12, marginTop: 1 },
+  keywordChipsRow: {
     gap: Spacing.xs,
+    paddingVertical: 4,
   },
-  statIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: BorderRadius.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  statValue: { fontSize: 16, fontWeight: '700' },
-  statLabel: { fontSize: 11, fontWeight: '500' },
-  sizeInfo: {
-    borderRadius: BorderRadius.md,
-    padding: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  sizeLabel: { fontSize: 12, fontWeight: '500' },
-  sizeValue: { fontSize: 14, fontWeight: '700' },
-  featuresCard: {
-    borderRadius: BorderRadius.lg,
+  keywordChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: BorderRadius.full,
     borderWidth: 1,
-    padding: Spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 1,
   },
-  featuresTitle: { fontSize: 15, fontWeight: '700', marginBottom: Spacing.md },
-  featureRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    paddingVertical: Spacing.sm,
+  keywordChipText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
-  featureName: { fontSize: 13, fontWeight: '500', flex: 1 },
-  syncBtn: {
-    borderRadius: BorderRadius.lg,
-    height: 54,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.md,
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  syncBtnText: { color: '#fff', fontSize: 16, fontWeight: '700', letterSpacing: 0.3 },
-  clearBtn: {
-    borderRadius: BorderRadius.lg,
-    height: 54,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.md,
-    shadowColor: '#EF4444',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  clearBtnText: { color: '#fff', fontSize: 16, fontWeight: '700', letterSpacing: 0.3 },
-  infoSection: {
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    flexDirection: 'row',
-    gap: Spacing.md,
-    alignItems: 'flex-start',
-  },
-  infoText: { fontSize: 12, lineHeight: 18, flex: 1 },
-  assistantBtn: {
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    padding: Spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-  },
-  assistantTitle: { fontSize: 14, fontWeight: '700' },
-  assistantSub: { fontSize: 12, marginTop: 2 },
-  qaSection: {
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    padding: Spacing.md,
-    gap: Spacing.md,
-  },
-  qaHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  qaTitle: { fontSize: 15, fontWeight: '700' },
   inputWrapper: {
     flexDirection: 'row',
-    gap: Spacing.sm,
     alignItems: 'center',
+    gap: Spacing.sm,
   },
   input: {
     flex: 1,
+    height: 46,
     borderWidth: 1,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    fontSize: 13,
-    maxHeight: 80,
+    borderRadius: BorderRadius.lg,
+    paddingHorizontal: Spacing.md,
+    fontSize: 14,
   },
   sendBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: BorderRadius.md,
+    width: 46,
+    height: 46,
+    borderRadius: BorderRadius.lg,
     justifyContent: 'center',
     alignItems: 'center',
   },
   answerBox: {
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
     padding: Spacing.md,
+    gap: Spacing.sm,
   },
   answerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: Spacing.sm,
   },
-  answerTitle: { fontSize: 14, fontWeight: '700', flex: 1 },
-  confidence: { fontSize: 12, fontWeight: '600' },
-  answerContent: { gap: Spacing.sm },
+  answerTitle: { fontSize: 15, fontWeight: '800', flex: 1 },
+  confBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.full,
+  },
+  confBadgeText: { color: '#10B981', fontSize: 11, fontWeight: '700' },
+  arabicCard: {
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    padding: Spacing.md,
+    alignItems: 'center',
+    gap: 4,
+  },
+  arabicText: { fontSize: 18, fontWeight: '700', textAlign: 'center', lineHeight: 28 },
+  translitText: { fontSize: 12, fontStyle: 'italic', textAlign: 'center' },
+  answerContent: { gap: 6 },
   answerText: { fontSize: 13, lineHeight: 18 },
+  relatedMediaBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    marginTop: 4,
+  },
+  relatedMediaBtnText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  statusCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1,
+    padding: Spacing.lg,
+  },
+  statusBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statusTitle: { fontSize: 15, fontWeight: '700' },
+  statusText: { fontSize: 12, marginTop: 2 },
+  statsCard: {
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1,
+    padding: Spacing.lg,
+    gap: Spacing.md,
+  },
+  statsTitle: { fontSize: 15, fontWeight: '700' },
+  statsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: Spacing.xs,
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
+  },
+  statIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: BorderRadius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statValue: { fontSize: 16, fontWeight: '800' },
+  statLabel: { fontSize: 11 },
+  sizeInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+  },
+  sizeLabel: { fontSize: 12 },
+  sizeValue: { fontSize: 13, fontWeight: '700' },
+  syncBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    paddingVertical: 16,
+    borderRadius: BorderRadius.xl,
+  },
+  syncBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  clearBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    paddingVertical: 14,
+    borderRadius: BorderRadius.xl,
+  },
+  clearBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  infoSection: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
+  },
+  infoText: { flex: 1, fontSize: 12, lineHeight: 18 },
 });

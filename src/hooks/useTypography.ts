@@ -1,17 +1,22 @@
-import { useAtom } from 'jotai';
-import { elderlyModeAtom } from '@/store/elderlyModeAtom';
-import { Typography } from '@/constants/theme';
+import { Typography } from "@/constants/theme";
+import { elderlyModeAtom } from "@/store/elderlyModeAtom";
+import { useAtom } from "jotai";
 
 export interface AdjustedTypography {
-  display: { fontSize: number; fontWeight: '800'; letterSpacing: number };
-  headline: { fontSize: number; fontWeight: '800'; letterSpacing: number };
-  section: { fontSize: number; fontWeight: '700'; letterSpacing: number };
-  subhead: { fontSize: number; fontWeight: '700'; letterSpacing: number };
-  body: { fontSize: number; fontWeight: '400'; letterSpacing: number };
-  bodyMedium: { fontSize: number; fontWeight: '500'; letterSpacing: number };
-  small: { fontSize: number; fontWeight: '400'; letterSpacing: number };
-  caption: { fontSize: number; fontWeight: '400'; letterSpacing: number };
-  overline: { fontSize: number; fontWeight: '600'; letterSpacing: number; textTransform: 'uppercase' };
+  display: { fontSize: number; fontWeight: "800"; letterSpacing: number };
+  headline: { fontSize: number; fontWeight: "800"; letterSpacing: number };
+  section: { fontSize: number; fontWeight: "700"; letterSpacing: number };
+  subhead: { fontSize: number; fontWeight: "700"; letterSpacing: number };
+  body: { fontSize: number; fontWeight: "400"; letterSpacing: number };
+  bodyMedium: { fontSize: number; fontWeight: "500"; letterSpacing: number };
+  small: { fontSize: number; fontWeight: "400"; letterSpacing: number };
+  caption: { fontSize: number; fontWeight: "400"; letterSpacing: number };
+  overline: {
+    fontSize: number;
+    fontWeight: "600";
+    letterSpacing: number;
+    textTransform: "uppercase";
+  };
 }
 
 /**
@@ -69,7 +74,7 @@ export const useTypography = (): AdjustedTypography => {
       fontSize: Typography.overline.fontSize + adjustment,
       fontWeight: Typography.overline.fontWeight,
       letterSpacing: Typography.overline.letterSpacing,
-      textTransform: 'uppercase' as const,
+      textTransform: "uppercase" as const,
     },
   };
 };

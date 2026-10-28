@@ -1,14 +1,15 @@
 {
   "expo": {
-    "name": "smart-umrah-f",
-    "slug": "smart-umrah-f",
+    "name": "smart-umrah-f-latest",
+    "slug": "smart-umrah-f-latest",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "smartumrahf",
+    "scheme": "smartumrahflatest",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.shahbazpro2.smartumrahflatest"
     },
     "android": {
       "adaptiveIcon": {
@@ -17,7 +18,8 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.shahbazpro2.smartumrahflatest"
     },
     "web": {
       "output": "static",
@@ -34,11 +36,21 @@
             "imageWidth": 76
           }
         }
-      ]
+      ],
+      "expo-video",
+      "expo-audio",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "3d2f24d3-d56c-4fd3-a671-716f1b70c937"
+      }
+    },
+    "owner": "shahbazpro2"
   }
 }

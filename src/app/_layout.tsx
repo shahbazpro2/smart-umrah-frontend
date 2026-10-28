@@ -5,12 +5,15 @@ import { Provider } from 'jotai';
 import { useEffect, useRef } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import 'react-native-reanimated';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { AuthProvider, useAuth } from '@/store/auth.context';
 import { NetworkProvider } from '@/store/network.context';
+import { appSettingsAtom, loadPersistedSettings } from '@/store/settings.store';
 import { ToastProvider } from '@/store/toast.context';
+import { useSetAtom } from 'jotai';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -27,6 +30,11 @@ function RootLayoutContent() {
   const segments = useSegments();
   const router = useRouter();
   const hasRedirected = useRef(false);
+  const setAppSettings = useSetAtom(appSettingsAtom);
+
+  useEffect(() => {
+    loadPersistedSettings().then(setAppSettings);
+  }, [setAppSettings]);
 
   useEffect(() => {
     if (loading) return;
@@ -50,32 +58,31 @@ function RootLayoutContent() {
   }
 
   return (
-    // Single root SafeAreaView — all screens inherit top/bottom insets from here.
-    // Individual screens should NOT add edges={['top']} or edges={['bottom']}
-    // unless they need to override (e.g. a screen with a custom background header).
-    <SafeAreaView style={styles.root} edges={['top', 'bottom', 'left', 'right']}>
+    <View style={styles.root}>
       <StatusBar style="dark" />
       <OfflineBanner />
       <Slot />
-    </SafeAreaView>
+    </View>
   );
 }
 
 export default function RootLayout() {
   return (
-    <SafeAreaProvider>
-      <Provider>
-        <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <NetworkProvider>
-              <ToastProvider>
-                <RootLayoutContent />
-              </ToastProvider>
-            </NetworkProvider>
-          </AuthProvider>
-        </QueryClientProvider>
-      </Provider>
-    </SafeAreaProvider>
+    <ErrorBoundary>
+      <SafeAreaProvider>
+        <Provider>
+          <QueryClientProvider client={queryClient}>
+            <AuthProvider>
+              <NetworkProvider>
+                <ToastProvider>
+                  <RootLayoutContent />
+                </ToastProvider>
+              </NetworkProvider>
+            </AuthProvider>
+          </QueryClientProvider>
+        </Provider>
+      </SafeAreaProvider>
+    </ErrorBoundary>
   );
 }
 

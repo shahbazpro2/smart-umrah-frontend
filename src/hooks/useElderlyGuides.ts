@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
-import api from '@/services/api';
+import api from "@/services/api";
+import { useQuery } from "@tanstack/react-query";
 
 export interface ElderlyGuide {
   _id: string;
@@ -34,11 +34,11 @@ export interface ElderlyModifications {
   emergencyTips: string[];
 }
 
-export const useGetAllElderlyGuides = (language: string = 'en') => {
+export const useGetAllElderlyGuides = (language: string = "en") => {
   return useQuery({
-    queryKey: ['elderlyGuides', language],
+    queryKey: ["elderlyGuides", language],
     queryFn: async () => {
-      const { data } = await api.get<ElderlyGuide[]>('/elderly-guides', {
+      const { data } = await api.get<ElderlyGuide[]>("/elderly-guides", {
         params: { language },
       });
       return data;
@@ -47,13 +47,19 @@ export const useGetAllElderlyGuides = (language: string = 'en') => {
   });
 };
 
-export const useGetElderlyGuideByRitual = (ritualId: string, language: string = 'en') => {
+export const useGetElderlyGuideByRitual = (
+  ritualId: string,
+  language: string = "en",
+) => {
   return useQuery({
-    queryKey: ['elderlyGuide', ritualId, language],
+    queryKey: ["elderlyGuide", ritualId, language],
     queryFn: async () => {
-      const { data } = await api.get<ElderlyGuide>(`/elderly-guides/ritual/${ritualId}`, {
-        params: { language },
-      });
+      const { data } = await api.get<ElderlyGuide>(
+        `/elderly-guides/ritual/${ritualId}`,
+        {
+          params: { language },
+        },
+      );
       return data;
     },
     enabled: !!ritualId,
@@ -61,15 +67,18 @@ export const useGetElderlyGuideByRitual = (ritualId: string, language: string = 
   });
 };
 
-export const useGetElderlyModifications = (ritualId: string, language: string = 'en') => {
+export const useGetElderlyModifications = (
+  ritualId: string,
+  language: string = "en",
+) => {
   return useQuery({
-    queryKey: ['elderlyModifications', ritualId, language],
+    queryKey: ["elderlyModifications", ritualId, language],
     queryFn: async () => {
       const { data } = await api.get<ElderlyModifications>(
         `/elderly-guides/modifications/${ritualId}`,
         {
           params: { language },
-        }
+        },
       );
       return data;
     },
@@ -80,9 +89,9 @@ export const useGetElderlyModifications = (ritualId: string, language: string = 
 
 export const useGetHealthWarnings = () => {
   return useQuery({
-    queryKey: ['healthWarnings'],
+    queryKey: ["healthWarnings"],
     queryFn: async () => {
-      const { data } = await api.get('/elderly-guides/warnings/all');
+      const { data } = await api.get("/elderly-guides/warnings/all");
       return data;
     },
     staleTime: 1000 * 60 * 30,

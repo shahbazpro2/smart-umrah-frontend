@@ -1,12 +1,14 @@
 import { BorderRadius, Colors, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useElderlyMode } from '@/hooks/useElderlyMode';
-import { useGetAllRituals, useGetProgress } from '@/hooks/useRitualQueries';
+import { useGetAllRituals, useGetProgress, useResetProgressMutation } from '@/hooks/useRitualQueries';
+import { useToast } from '@/hooks/useToast';
 import { useTranslation } from '@/hooks/useTranslation';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef } from 'react';
 import {
+  Alert,
   Animated,
   FlatList,
   Pressable,
@@ -95,7 +97,7 @@ function ChecklistRow({ ritual, isCompleted, isEnabled, isNewlyUnlocked, lang, o
           <Animated.View
             pointerEvents="none"
             style={[
-              StyleSheet.absoluteFillObject,
+              StyleSheet.absoluteFill,
               {
                 borderRadius: BorderRadius.lg,
                 backgroundColor: colors.success,
@@ -175,9 +177,34 @@ export default function UmrahGuideScreen() {
   const { t, lang } = useTranslation();
   const { data: rituals = [], isLoading } = useGetAllRituals();
   const { data: progress = [] } = useGetProgress();
+  const resetMutation = useResetProgressMutation();
+  const toast = useToast();
   const flatListRef = useRef<FlatList>(null);
 
   const isRTL = lang === 'ar' || lang === 'ur';
+
+  const handleConfirmReset = () => {
+    Alert.alert(
+      'Reset Umrah Journey?',
+      'Are you sure you want to restart your journey from Step 1? This will reset all completed steps so you can perform them again.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset to Step 1',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await resetMutation.mutateAsync();
+              toast.success('Journey Reset', 'All steps reset. You are now at Step 1.');
+              flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+            } catch {
+              toast.error('Reset Failed', 'Could not reset journey. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   // Create completed set and find next enabled ritual
   const completedSet = useMemo(() => {
@@ -245,7 +272,16 @@ export default function UmrahGuideScreen() {
             {t('umrahGuide.progress')} {completedCount} / 8
           </Text>
         </View>
-        <View style={{ width: 40 }} />
+        <Pressable
+          onPress={handleConfirmReset}
+          disabled={resetMutation.isPending || completedCount === 0}
+          style={[
+            styles.resetNavBtn,
+            { borderColor: colors.border, opacity: completedCount === 0 ? 0.35 : 1 }
+          ]}
+        >
+          <Ionicons name="refresh" size={18} color={completedCount > 0 ? colors.primary : colors.icon} />
+        </Pressable>
       </View>
 
       {/* Progress Bar */}
@@ -272,6 +308,14 @@ export default function UmrahGuideScreen() {
             <Text style={[styles.completionSub, { fontSize: 13 + (fontSize.small - 12) }]}>
               {t('umrahGuide.congratulationsSub')}
             </Text>
+            <Pressable
+              onPress={handleConfirmReset}
+              disabled={resetMutation.isPending}
+              style={styles.startNewJourneyBtn}
+            >
+              <Ionicons name="refresh-circle" size={18} color="#065F46" />
+              <Text style={styles.startNewJourneyBtnText}>Reset Journey & Start from Step 1</Text>
+            </Pressable>
           </View>
         </View>
       )}
@@ -338,6 +382,30 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  resetNavBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  startNewJourneyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#fff',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: BorderRadius.full,
+    marginTop: Spacing.sm,
+  },
+  startNewJourneyBtnText: {
+    color: '#065F46',
+    fontSize: 13,
+    fontWeight: '800',
   },
   navTitle: { fontWeight: '800', letterSpacing: -0.5 },
   navCounter: { fontWeight: '500', marginTop: 2 },

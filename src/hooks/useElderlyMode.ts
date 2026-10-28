@@ -1,6 +1,6 @@
-import { useAtom } from 'jotai';
-import { elderlyModeAtom } from '@/store/elderlyModeAtom';
-import { Spacing } from '@/constants/theme';
+import { Spacing } from "@/constants/theme";
+import { elderlyModeAtom } from "@/store/elderlyModeAtom";
+import { useAtom } from "jotai";
 
 interface ElderlySpacing {
   xs: number;

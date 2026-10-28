@@ -40,7 +40,7 @@ export default function ElderlyCompanionScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.headerSection}>
-          <Pressable onPress={handleBack} style={styles.backBtn}>
+          <Pressable onPress={handleBack} style={[styles.backBtn, { borderColor: colors.border }]}>
             <Ionicons name="chevron-back" size={22} color={colors.primary} />
           </Pressable>
           <View style={{ flex: 1 }}>
@@ -162,6 +162,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: BorderRadius.md,
+    borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },

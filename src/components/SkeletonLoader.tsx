@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { View, Animated, StyleSheet } from 'react-native';
+import { BorderRadius, Colors, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors, BorderRadius, Spacing } from '@/constants/theme';
+import { useEffect, useState } from 'react';
+import { Animated, StyleSheet, View } from 'react-native';
 
 interface SkeletonLoaderProps {
   width?: number | string;
